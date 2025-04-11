@@ -1,0 +1,19 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "sqlite" // Change this if using another database.
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ScheduledPost {
+  id            Int      @id @default(autoincrement())
+  imageUri      String
+  title         String
+  scheduledTime DateTime
+  posted        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}

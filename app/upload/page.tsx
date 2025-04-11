@@ -59,7 +59,6 @@ export default function UploadPage() {
           name="files"
           // The following attributes allow selection of an entire folder.
           {...({ webkitdirectory: "true", directory: "true", multiple: true } as DirectoryInputProps)}
-
           className="border p-2"
         />
         <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
