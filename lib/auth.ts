@@ -37,19 +37,26 @@ export const authOptions: NextAuthOptions = {
     },
   ],
   callbacks: {
+    async signIn({ user, account, profile, email, credentials }) {
+        console.log("SIGNIN CALLBACK:", { user, account, profile, email, credentials });
+        return true; // Allow sign-in
+        },
     async jwt({ token, account }) {
       if (account) {
+        console.log("ACCOUNT", account);
         token.accessToken = account.access_token;
       }
+      console.log("JWT TOKEN", token);
       return token;
     },
-    async session({ session, token }) {
-      if (token) {
-        session.accessToken = token.accessToken as string;
-      }
-      return session;
-    },
+    // filepath: /home/alex/projects/instagram-to-bluesky/lib/auth.ts
+async session({ session, token }) {
+    console.log("SESSION CALLBACK - TOKEN", token);
+    session.accessToken = token.accessToken as string; // TypeScript now recognizes this
+    return session;
+  }
   },
+  
   pages: {
     signIn: "/auth/signin", // Your custom sign-in page if you have one
   },
