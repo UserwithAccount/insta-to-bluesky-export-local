@@ -1,7 +1,5 @@
-// prisma/schema.prisma
-
 datasource db {
-  provider = "sqlite" // Change this if using another database.
+  provider = "sqlite" // or your preferred provider
   url      = env("DATABASE_URL")
 }
 
@@ -10,10 +8,17 @@ generator client {
 }
 
 model ScheduledPost {
-  id            Int      @id @default(autoincrement())
-  imageUri      String
+  id            Int                   @id @default(autoincrement())
   title         String
   scheduledTime DateTime
-  posted        Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  posted        Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+  images        ScheduledPostImage[]
+}
+
+model ScheduledPostImage {
+  id       Int             @id @default(autoincrement())
+  imageUri String
+  postId   Int
+  post     ScheduledPost   @relation(fields: [postId], references: [id])
 }

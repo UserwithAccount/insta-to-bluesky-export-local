@@ -7,8 +7,5 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 // next.config.js
 module.exports = {
-  experimental: {
-    appDir: true, // Enable App Router
-  },
 }
 

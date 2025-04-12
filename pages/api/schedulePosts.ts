@@ -5,10 +5,25 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// The API now accepts posts in one of two shapes:
+// Format A (Single Image):
+//   {
+//     uri: string,          // image public URL
+//     description: string,  // post caption
+//     scheduledTime: string // ISO datetime string
+//   }
+// Format B (Multiple Images):
+//   {
+//     images: string[],     // array of image public URLs (max 4)
+//     title?: string,       // post title (optional)
+//     scheduledTime: string // ISO datetime string
+//   }
 type ScheduledPostInput = {
-  uri: string;           // The public URL of the image.
-  title: string;         // The post title (use an empty string if none is provided).
-  scheduledTime: string; // A date/time string in ISO format.
+  title?: string;
+  description?: string;
+  scheduledTime: string;
+  images?: string[];
+  uri?: string;
 };
 
 export default async function handler(
@@ -21,6 +36,7 @@ export default async function handler(
   }
 
   try {
+    console.log("Incoming request body:", req.body);
     const scheduledPosts: ScheduledPostInput[] = req.body;
 
     if (!Array.isArray(scheduledPosts)) {
@@ -28,19 +44,44 @@ export default async function handler(
       return;
     }
 
-    // Create scheduled posts in the database.
     const createdPosts = await Promise.all(
       scheduledPosts.map(async (post) => {
-        // Ensure title always has a value (default to empty string).
-        const title = post.title || "";
-        // Create the scheduled post record using the Prisma client.
-        return await prisma.scheduledPost.create({
+        // Determine the caption. Use title if provided; otherwise, use description; default to empty.
+        const caption = post.title || post.description || "";
+        
+        // Determine the images array.
+        let imagesToUse: string[] = [];
+        if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+          imagesToUse = post.images.slice(0, 4);
+        } else if (post.uri && typeof post.uri === "string") {
+          imagesToUse = [post.uri];
+        }
+
+        if (imagesToUse.length === 0) {
+          throw new Error("Each post must contain at least one image.");
+        }
+
+        // Create the scheduled post record (without images) in the database.
+        const createdPost = await prisma.scheduledPost.create({
           data: {
-            imageUri: post.uri,
-            title,
+            title: caption,
             scheduledTime: new Date(post.scheduledTime),
           },
         });
+
+        // Create separate records for each image associated with the post.
+        await Promise.all(
+          imagesToUse.map(async (uri) => {
+            return await prisma.scheduledPostImage.create({
+              data: {
+                imageUri: uri,
+                postId: createdPost.id,
+              },
+            });
+          })
+        );
+
+        return createdPost;
       })
     );
 
