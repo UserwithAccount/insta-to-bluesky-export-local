@@ -24,6 +24,22 @@ function runMiddleware(req: NextApiRequest, res: NextApiResponse, fn: Function) 
   });
 }
 
+function decodeUtf8String(input: string): string {
+  try {
+    const decoder = new TextDecoder("utf-8");
+    const bytes = new Uint8Array([...input].map((c) => c.charCodeAt(0)));
+    return decoder.decode(bytes);
+  } catch {
+    return input;
+  }
+}
+
+function formatTitle(title: string): string {
+  let decoded = decodeUtf8String(title);
+  decoded = decoded.replace(/\\n/g, "\n"); // enable new lines
+  return decoded;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 
@@ -60,13 +76,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const output: {
       postId: string;
       title: string;
+      hasMention: boolean;
       images: string[];
     }[] = [];
 
     for (const post of rawPosts) {
-      const postId = String(post.creation_timestamp || uuidv4());
-      const title = post.title || "Untitled";
       const media = Array.isArray(post.media) ? post.media : [];
+      const postId =
+        post.creation_timestamp?.toString() || media[0]?.creation_timestamp?.toString() || uuidv4();
+
+      const rawTitle =
+        post.title?.trim() ||
+        media.find((m: any) => m.title?.trim())?.title?.trim() ||
+        "Untitled";
+
+      const title = formatTitle(rawTitle);
+      const hasMention = /@\w+/.test(title);
 
       const imageUris: string[] = [];
 
@@ -85,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (imageUris.length > 0) {
-        output.push({ postId, title, images: imageUris });
+        output.push({ postId, title, hasMention, images: imageUris });
       }
     }
 

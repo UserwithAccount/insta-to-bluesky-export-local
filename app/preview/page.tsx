@@ -7,8 +7,9 @@ import "swiper/css";
 
 type ScheduledPost = {
   title: string;
-  images: string[];           // Array of image URIs per post
-  scheduledTime?: string;     // Optional scheduled time (ISO format)
+  images: string[];
+  scheduledTime?: string;
+  hasMention?: boolean;
 };
 
 export default function PreviewPage() {
@@ -18,7 +19,6 @@ export default function PreviewPage() {
   const [intervalHours, setIntervalHours] = useState<number>(24);
   const router = useRouter();
 
-  // Fetch posts grouped by title from the listUploads API
   useEffect(() => {
     async function fetchPosts() {
       try {
@@ -42,7 +42,6 @@ export default function PreviewPage() {
     fetchPosts();
   }, []);
 
-  // Handlers
   const handleTitleChange = (index: number, newTitle: string) => {
     const updated = [...posts];
     updated[index].title = newTitle;
@@ -103,7 +102,6 @@ export default function PreviewPage() {
 
         {error && <p className="text-red-600 text-center">{error}</p>}
 
-        {/* Periodic Schedule Controls */}
         <div className="bg-white shadow-md rounded-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Periodic Scheduling</h2>
           <div className="flex flex-col md:flex-row gap-6">
@@ -135,57 +133,56 @@ export default function PreviewPage() {
           </div>
         </div>
 
-        {/* Post Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {posts.map((post, idx) => (
             <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
+              {/* Controls above image */}
+              <div className="flex justify-between mb-2 items-center">
+                {post.hasMention && (
+                  <span className="text-yellow-500 text-xl">⚠️</span>
+                )}
+                <button
+                  onClick={() => removePost(idx)}
+                  className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+
               {/* Carousel */}
-              <div className="w-full mb-4" style={{ aspectRatio: "4 / 3" }}>
+              <div className="w-full mb-4 rounded overflow-hidden" style={{ aspectRatio: "4 / 3" }}>
                 <Swiper spaceBetween={10}>
                   {post.images.map((img, i) => (
                     <SwiperSlide key={i}>
                       <img
                         src={img}
                         alt={`Post ${idx + 1} Image ${i + 1}`}
-                        className="w-full h-full object-cover rounded"
+                        className="w-full h-full object-cover"
                       />
                     </SwiperSlide>
                   ))}
                 </Swiper>
               </div>
 
-              {/* Title Input */}
               <label className="block text-sm font-semibold mb-1">Title</label>
-              <input
-                type="text"
+              <textarea
+                rows={3}
                 value={post.title}
                 onChange={(e) => handleTitleChange(idx, e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded mb-3"
+                className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
               />
 
-              {/* Scheduled Time Input */}
-              <label className="block text-sm font-semibold mb-1">
-                Scheduled Time
-              </label>
+              <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
               <input
                 type="datetime-local"
                 value={post.scheduledTime || ""}
                 onChange={(e) => handleTimeChange(idx, e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded"
               />
-
-              {/* Remove Button */}
-              <button
-                onClick={() => removePost(idx)}
-                className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
             </div>
           ))}
         </div>
 
-        {/* Schedule Button */}
         <div className="flex justify-center mt-10">
           <button
             onClick={schedulePosts}

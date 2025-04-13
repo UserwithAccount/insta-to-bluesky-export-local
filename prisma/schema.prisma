@@ -1,6 +1,7 @@
 datasource db {
-  provider = "sqlite" // or your preferred provider
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+   url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -21,4 +22,11 @@ model ScheduledPostImage {
   imageUri String
   postId   Int
   post     ScheduledPost   @relation(fields: [postId], references: [id])
+}
+
+model Credential {
+  id          Int      @id @default(autoincrement())
+  handle      String
+  password String
+  createdAt   DateTime @default(now())
 }
