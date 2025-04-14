@@ -3,9 +3,8 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 import CryptoJS from "crypto-js";
 
-const SECRET_KEY = process.env.CREDENTIAL_SECRET_KEY!;
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const SECRET_KEY = process.env.CREDENTIAL_SECRET_KEY;
   if (!SECRET_KEY) {
     return res.status(500).json({ success: false, error: "Secret key not configured" });
   }
