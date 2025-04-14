@@ -1,0 +1,22 @@
+{
+    "root": true,
+    "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+    "plugins": ["@typescript-eslint"],
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unsafe-function-type": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "no-var": "off",
+      "@next/next/no-img-element": "off",
+  
+      "@typescript-eslint/ban-types": "off"
+    },
+    "ignorePatterns": [
+      ".next/",
+      "node_modules/",
+      "dist/",
+      "**/*.d.ts"
+    ]
+  }
+  

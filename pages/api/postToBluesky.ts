@@ -1,6 +1,5 @@
 // pages/api/postToBluesky.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
 import { postToBluesky } from "@/lib/postToBluesky";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

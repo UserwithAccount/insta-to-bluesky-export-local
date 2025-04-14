@@ -26,7 +26,7 @@ export default function PreviewPage() {
         const res = await fetch("/api/listUploads");
         const data = await res.json();
         if (data.success) {
-          const enriched = data.posts.map((post: any) => ({
+          const enriched = data.posts.map((post: ScheduledPost) => ({
             ...post,
             scheduledTime: post.scheduledTime || "",
           }));

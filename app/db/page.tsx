@@ -29,8 +29,6 @@ export default function DbPage() {
   const [weekGroups, setWeekGroups] = useState<Record<string, DbPost[]>>({});
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
 
-  const router = useRouter();
-
   useEffect(() => {
     fetchPosts();
   }, []);

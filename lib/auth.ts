@@ -1,6 +1,5 @@
 // lib/auth.ts
 
-import NextAuth from "next-auth";
 import { NextAuthOptions } from "next-auth";
 
 export const authOptions: NextAuthOptions = {

@@ -7,7 +7,7 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  const [uploadId, setUploadId] = useState<string | null>(null);
+  const [setUploadId] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
@@ -72,23 +72,17 @@ export default function UploadPage() {
           setProgress(percent);
         }
       };
-
       xhr.onload = () => {
         setUploading(false);
         stopPolling();
-
         if (xhr.status === 200) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
-              addLog(`✅ Uploaded ${data.count} posts.`);
-              addLog("📦 Redirecting to preview...");
-              setTimeout(() => router.push("/preview"), 1500);
-            } else {
-              addLog(`❌ Error: ${data.error || "Unknown error"}`);
-            }
-          } catch (err) {
-            addLog("❌ Failed to parse response from server.");
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            addLog(`✅ Uploaded ${data.count} posts.`);
+            addLog("📦 Redirecting to preview...");
+            setTimeout(() => router.push("/preview"), 1500);
+          } else {
+            addLog(`❌ Error: ${data.error || "Unknown error"}`);
           }
         } else {
           addLog("❌ Upload failed.");
