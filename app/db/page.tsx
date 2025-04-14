@@ -6,7 +6,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import { FaExclamationTriangle } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
-import { supabase } from "@/lib/supabase"; // Import the shared Supabase client
+import { supabase } from "@/lib/supabaseClient"; // Import the shared Supabase client
 
 type DbPost = {
   id: number;
