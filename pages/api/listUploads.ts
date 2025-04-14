@@ -1,29 +1,30 @@
-// pages/api/listUploads.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const filePath = path.join(process.cwd(), "public", "uploads", "uploadData.json");
-    const fileContent = await fs.readFile(filePath, "utf-8");
-    const posts = JSON.parse(fileContent) as {
-      postId: string;
-      title: string;
-      images: string[];
-    }[];
+    const { data, error } = await supabase
+      .storage
+      .from("uploads")
+      .download("uploadData.json");
+
+    if (error || !data) {
+      console.error("Failed to download uploadData.json:", error);
+      return res.status(500).json({ error: "Failed to read upload data" });
+    }
+
+    const buffer = await data.arrayBuffer();
+    const jsonText = new TextDecoder("utf-8").decode(buffer);
+    const posts = JSON.parse(jsonText);
 
     res.status(200).json({ success: true, posts });
-  } catch (error) {
-    console.error("Failed to read uploadData.json:", error);
-    res.status(500).json({ error: "Failed to list uploaded posts" });
+  } catch (err) {
+    console.error("Error reading upload data from Supabase:", err);
+    res.status(500).json({ error: "Failed to read upload data" });
   }
 }

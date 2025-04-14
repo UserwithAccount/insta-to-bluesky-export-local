@@ -1,9 +1,8 @@
 // next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    // Disable Turbopack
-    turbo: false,
+  images: {
+    domains: ['localhost'], // add your Vercel domain here later too
   },
 };
 

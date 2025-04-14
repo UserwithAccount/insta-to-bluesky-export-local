@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
+import toast, { Toaster } from "react-hot-toast";
 
 type ScheduledPost = {
   title: string;
@@ -57,11 +58,12 @@ export default function PreviewPage() {
   const removePost = (index: number) => {
     const updated = posts.filter((_, i) => i !== index);
     setPosts(updated);
+    toast.success("Post removed");
   };
 
   const generatePeriodicSchedule = () => {
     if (!startDate) {
-      alert("Please select a start date & time.");
+      toast.error("Please select a start date & time.");
       return;
     }
     const base = new Date(startDate).getTime();
@@ -71,6 +73,7 @@ export default function PreviewPage() {
       scheduledTime: new Date(base + i * intervalMs).toISOString().slice(0, 16),
     }));
     setPosts(updated);
+    toast.success("Times generated");
   };
 
   const schedulePosts = async () => {
@@ -82,25 +85,26 @@ export default function PreviewPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`Successfully scheduled ${data.count} posts!`);
-        router.push("/");
+        toast.success(`Scheduled ${data.count} posts!`);
+        setTimeout(() => router.push("/"), 1500);
       } else {
-        alert(`Error: ${data.error}`);
+        toast.error(data.error);
       }
     } catch (err) {
       console.error("Schedule error:", err);
-      alert("Error scheduling posts.");
+      toast.error("Scheduling failed");
     }
   };
 
   return (
     <main className="bg-gray-100 min-h-screen py-8">
+      <Toaster />
       <div className="max-w-7xl mx-auto px-4">
-        <h1 className="text-3xl font-extrabold text-center mb-8">
+        <h1 className="text-3xl font-extrabold text-center mb-8 text-zinc-900">
           Preview & Schedule Posts
         </h1>
 
-        {error && <p className="text-red-600 text-center">{error}</p>}
+        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
 
         <div className="bg-white shadow-md rounded-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Periodic Scheduling</h2>
@@ -118,10 +122,10 @@ export default function PreviewPage() {
               <label className="block mb-1 font-medium">Interval (hours)</label>
               <input
                 type="number"
+                min={1}
                 value={intervalHours}
                 onChange={(e) => setIntervalHours(Number(e.target.value))}
                 className="w-full p-2 border border-gray-300 rounded"
-                min={1}
               />
             </div>
             <button

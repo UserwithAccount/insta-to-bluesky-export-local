@@ -1,63 +1,82 @@
+// pages/api/dbPosts.ts
+
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
+
+const prisma = new PrismaClient();
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
-    const posts = await prisma.scheduledPost.findMany({
-      include: {
-        images: true,
-      },
-    });
-    return res.status(200).json({
-      success: true,
-      posts: posts.map((post) => ({
+    try {
+      const posts = await prisma.scheduledPost.findMany({
+        orderBy: { scheduledTime: "asc" },
+        include: { images: true },
+      });
+
+      const formatted = posts.map((post) => ({
         id: post.id,
         title: post.title,
-        scheduledTime: post.scheduledTime?.toISOString(),
+        scheduledTime: post.scheduledTime?.toISOString() ?? null,
         posted: post.posted,
         images: post.images.map((img) => img.imageUri),
-      })),
-    });
+      }));
+
+      return res.status(200).json({ success: true, posts: formatted });
+    } catch (error) {
+      console.error("Failed to fetch posts:", error);
+      return res.status(500).json({ error: "Failed to fetch posts" });
+    }
   }
 
   if (req.method === "POST") {
     const { id, title, scheduledTime } = req.body;
+
     try {
+      const data: Record<string, any> = {};
+      if (title !== undefined) data.title = title;
+      if (scheduledTime !== undefined) data.scheduledTime = new Date(scheduledTime);
+
       const updated = await prisma.scheduledPost.update({
         where: { id },
-        data: {
-          ...(title !== undefined && { title }),
-          ...(scheduledTime !== undefined && { scheduledTime: new Date(scheduledTime) }),
-        },
+        data,
       });
+
       return res.status(200).json({ success: true, updated });
     } catch (error) {
       console.error("Failed to update post:", error);
-      return res.status(500).json({ success: false });
+      return res.status(500).json({ error: "Failed to update post" });
     }
   }
 
   if (req.method === "DELETE") {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ success: false, error: "Missing ID" });
+    const id = req.query.id as string;
+    if (!id) return res.status(400).json({ error: "Missing ID" });
 
     try {
-      // First delete related images
-      await prisma.scheduledPostImage.deleteMany({
-        where: { postId: parseInt(id as string) },
+      const images = await prisma.scheduledPostImage.findMany({
+        where: { postId: parseInt(id) },
       });
 
-      // Then delete the post
-      await prisma.scheduledPost.delete({
-        where: { id: parseInt(id as string) },
-      });
+      for (const img of images) {
+        const path = img.imageUri.replace(/^https:\/\/[^\/]+\/storage\/v1\/object\/public\//, "");
+        await supabase.storage.from("uploads").remove([path]);
+      }
+
+      await prisma.scheduledPostImage.deleteMany({ where: { postId: parseInt(id) } });
+      await prisma.scheduledPost.delete({ where: { id: parseInt(id) } });
 
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error("Failed to delete post:", error);
-      return res.status(500).json({ success: false });
+      return res.status(500).json({ error: "Failed to delete post" });
     }
   }
 
-  res.status(405).end();
+  return res.status(405).json({ error: "Method not allowed" });
 }
