@@ -2,112 +2,134 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
-  const [uploadId, setUploadId] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
-  const scrollToBottom = () => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = () => logEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [logs]);
+  useEffect(() => scrollToBottom(), [logs]);
 
-  const addLog = (message: string) => {
-    setLogs((prev) => [...prev, message]);
-  };
-
-  const startPolling = (id: string) => {
-    pollingRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/uploadLogs?uploadId=${id}`);
-        const data = await res.json();
-        if (Array.isArray(data.logs)) {
-          setLogs(data.logs);
-        }
-      } catch {
-        // Silent fail
-      }
-    }, 800);
-  };
-
-  const stopPolling = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  };
+  const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files) return;
 
-    const formData = new FormData();
-    for (const file of Array.from(files)) {
-      formData.append("files", file, file.webkitRelativePath || file.name);
-    }
-
-    const id = crypto.randomUUID();
-    setUploadId(id);
     setUploading(true);
-    setProgress(0);
     setLogs(["📂 Upload started..."]);
+    let uploadedCount = 0;
 
-    startPolling(id);
-
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `/api/upload?uploadId=${id}`, true);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setProgress(percent);
-        }
-      };
-
-      xhr.onload = () => {
-        setUploading(false);
-        stopPolling();
-
-        if (xhr.status === 200) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
-              addLog(`✅ Uploaded ${data.count} posts.`);
-              addLog("📦 Redirecting to preview...");
-              setTimeout(() => router.push("/preview"), 1500);
-            } else {
-              addLog(`❌ Error: ${data.error || "Unknown error"}`);
-            }
-          } catch (err) {
-            addLog("❌ Failed to parse response from server.");
-          }
-        } else {
-          addLog("❌ Upload failed.");
-        }
-      };
-
-      xhr.onerror = () => {
-        setUploading(false);
-        stopPolling();
-        addLog("❌ Upload failed due to a network error.");
-      };
-
-      xhr.send(formData);
-    } catch (err) {
-      setUploading(false);
-      stopPolling();
-      console.error("Upload error:", err);
-      addLog("❌ Upload error occurred.");
+    const jsonFile = Array.from(files).find((f) => f.name.endsWith(".json"));
+    if (!jsonFile) {
+      addLog("❌ JSON file missing.");
+      return setUploading(false);
     }
+
+    const jsonText = await jsonFile.text();
+    const rawPosts = JSON.parse(jsonText);
+
+    const imageMap = new Map<string, File>();
+    for (const file of Array.from(files)) {
+      if (file !== jsonFile) {
+        imageMap.set(file.name, file);
+      }
+    }
+
+    const output: {
+      postId: string;
+      title: string;
+      hasMention: boolean;
+      images: string[];
+    }[] = [];
+
+    for (const post of rawPosts) {
+      const media = Array.isArray(post.media) ? post.media : [];
+      const postId =
+        post.creation_timestamp?.toString() ||
+        media[0]?.creation_timestamp?.toString() ||
+        crypto.randomUUID();
+
+      const rawTitle =
+        post.title?.trim() ||
+        media.find((m: any) => m.title?.trim())?.title?.trim() ||
+        "Untitled";
+
+      const title = rawTitle.replace(/\\n/g, "\n");
+      const hasMention = /@\w+/.test(title);
+      const imageUris: string[] = [];
+
+      for (const item of media) {
+        const fileName = item.uri.split("/").pop();
+        if (!fileName) continue;
+
+        const file = imageMap.get(fileName);
+        if (!file) {
+          addLog(`⚠️ Missing file: ${fileName}`);
+          continue;
+        }
+
+        const { data: existing } = await supabase.storage
+          .from("uploads")
+          .list("", { search: fileName });
+
+        if (existing?.some((f) => f.name === fileName)) {
+          addLog(`⏭️ Skipped (already exists): ${fileName}`);
+          imageUris.push(`${supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl}`);
+          continue;
+        }
+
+        const { error } = await supabase.storage
+          .from("uploads")
+          .upload(fileName, file, {
+            upsert: false,
+            contentType: file.type,
+          });
+
+        if (error) {
+          addLog(`❌ Failed: ${fileName}`);
+        } else {
+          uploadedCount++;
+          addLog(`✅ Uploaded: ${fileName}`);
+          imageUris.push(`${supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl}`);
+        }
+
+        setProgress(Math.round((uploadedCount / files.length) * 100));
+      }
+
+      if (imageUris.length > 0) {
+        output.push({ postId, title, hasMention, images: imageUris });
+      }
+    }
+
+    // Upload uploadData.json
+    const jsonBuffer = new Blob([JSON.stringify(output, null, 2)], {
+      type: "application/json",
+    });
+
+    const { error: jsonError } = await supabase.storage
+      .from("uploads")
+      .upload("uploadData.json", jsonBuffer, { upsert: true });
+
+    if (jsonError) {
+      addLog("❌ Failed to upload uploadData.json");
+    } else {
+      addLog("📦 uploadData.json saved to Supabase");
+    }
+
+    setUploading(false);
+    addLog("🎉 Upload complete! Redirecting...");
+    setTimeout(() => router.push("/preview"), 1500);
   };
 
   return (
