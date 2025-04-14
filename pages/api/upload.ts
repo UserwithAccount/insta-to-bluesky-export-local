@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase"; // Import the shared Supabase client
 
 export const config = {
   api: {
@@ -12,10 +12,7 @@ export const config = {
   },
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).any();

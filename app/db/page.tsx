@@ -1,19 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { format, startOfWeek } from "date-fns";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import { FaExclamationTriangle } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
-
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabase } from "@/lib/supabase"; // Import the shared Supabase client
 
 type DbPost = {
   id: number;
