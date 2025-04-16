@@ -18,127 +18,140 @@ export default function UploadPage() {
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-  
+
     setUploading(true);
     setLogs(["📂 Upload started..."]);
     let uploadedCount = 0;
-  
+
     const jsonFile = Array.from(files).find((f) => f.name.endsWith(".json"));
     if (!jsonFile) {
       addLog("❌ JSON file missing.");
       return setUploading(false);
     }
-  
+
     // 🧠 Fetch all existing files in the 'uploads' bucket once
     const { data: allFiles, error: listError } = await supabase.storage.from("uploads").list("", {
       limit: 9999,
     });
-  
+
     const existingFilenames = allFiles?.map((f) => f.name) || [];
-  
+
     const jsonText = await jsonFile.text();
     const rawPosts = JSON.parse(jsonText);
-  
+
     const imageMap = new Map<string, File>();
     for (const file of Array.from(files)) {
       if (file !== jsonFile) imageMap.set(file.name, file);
     }
-  
+
     const output: {
       postId: string;
       title: string;
       hasMention: boolean;
       images: string[];
     }[] = [];
-  
+
     for (const post of rawPosts) {
       const media = Array.isArray(post.media) ? post.media : [];
       const postId =
         post.creation_timestamp?.toString() ||
         media[0]?.creation_timestamp?.toString() ||
         crypto.randomUUID();
-  
+
       const rawTitle =
         post.title?.trim() ||
         media.find((m: any) => m.title?.trim())?.title?.trim() ||
         "Untitled";
-  
+
       const title = decodeURIComponent(escape(rawTitle)).replace(/\\n/g, "\n");
       const hasMention = /@\w+/.test(title);
       const imageUris: string[] = [];
-  
+
       for (const item of media) {
         const fileName = item.uri.split("/").pop();
         if (!fileName) continue;
-  
+
         const file = imageMap.get(fileName);
         if (!file) {
           addLog(`⚠️ Missing file: ${fileName}`);
           continue;
         }
-  
+
         // ✅ Check if file already exists in memory
         if (existingFilenames.includes(fileName)) {
           addLog(`⏭️ Skipped (already exists): ${fileName}`);
         } else {
-          const { error } = await supabase.storage
-            .from("uploads")
-            .upload(fileName, file, {
-              upsert: false,
-              contentType: file.type,
-            });
-  
-          if (error) {
-            addLog(`❌ Failed: ${fileName} (${error.message})`);
-            continue;
-          } else {
-            addLog(`✅ Uploaded: ${fileName}`);
-            uploadedCount++;
+          try {
+            const { error } = await supabase.storage
+              .from("uploads")
+              .upload(fileName, file, {
+                upsert: false,
+                contentType: file.type,
+              });
+
+            if (error) {
+              // Catch 409 conflict (duplicate) and skip gracefully
+              if (error.message.includes("resource already exists")) {
+                addLog(`⏭️ Skipped (already exists): ${fileName}`);
+              } else {
+                addLog(`❌ Failed: ${fileName} (${error.message})`);
+              }
+            } else {
+              addLog(`✅ Uploaded: ${fileName}`);
+              uploadedCount++;
+            }
+          } catch (err: any) {
+            if (err?.message?.includes("resource already exists")) {
+              addLog(`⏭️ Skipped (already exists): ${fileName}`);
+            } else {
+              console.error("Upload failed:", err);
+              addLog(`❌ Upload error: ${fileName}`);
+            }
           }
         }
-  
+
         const publicUrl = supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
         imageUris.push(publicUrl);
         setProgress(Math.round((uploadedCount / files.length) * 100));
       }
-  
+
       if (imageUris.length > 0) {
         output.push({ postId, title, hasMention, images: imageUris });
       }
     }
-  
+
     // Upload uploadData.json
     const jsonBlob = new Blob([JSON.stringify(output, null, 2)], {
       type: "application/json",
     });
-  
+
     const { error: jsonError } = await supabase.storage
       .from("uploads")
       .upload(`uploadData-${Date.now()}.json`, jsonBlob, {
         upsert: true,
         contentType: "application/json",
       });
-  
+
     if (jsonError) {
       addLog("❌ Failed to upload uploadData.json");
     } else {
       addLog("📦 uploadData.json saved to Supabase");
     }
-  
+
     // Send to API
     const res = await fetch("/api/schedulePosts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(output),
     });
-  
+
     if (res.ok) {
       addLog("🎉 Scheduled successfully");
       setTimeout(() => router.push("/db"), 1500);
     } else {
       addLog("❌ Failed to schedule posts");
     }
-  
+
     setUploading(false);
   };
 
