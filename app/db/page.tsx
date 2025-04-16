@@ -56,7 +56,7 @@ export default function DbPage() {
 
   const handleTitleChange = async (id: number, newTitle: string) => {
     const updatedPosts = posts.map((post) =>
-      post.id === id ? { ...post, title: newTitle } : post
+      post.id === id ? { ...post, title: newTitle, editing: false } : post
     );
     setPosts(updatedPosts);
 
@@ -195,14 +195,14 @@ export default function DbPage() {
                         rows={4}
                         className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded mb-3 bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
                         value={post.title}
-                        onChange={(e) => handleTitleChange(post.id, e.target.value)}
-                        onBlur={() =>
+                        onChange={(e) =>
                           setPosts((prev) =>
                             prev.map((p) =>
-                              p.id === post.id ? { ...p, editing: false } : p
+                              p.id === post.id ? { ...p, title: e.target.value } : p
                             )
                           )
                         }
+                        onBlur={(e) => handleTitleChange(post.id, e.target.value)}
                         autoFocus
                       />
                     )}
@@ -214,7 +214,6 @@ export default function DbPage() {
                       className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
                       value={post.scheduledTime ? post.scheduledTime.slice(0, 16) : ""}
                       onChange={(e) => handleTimeChange(post.id, e.target.value)}
-                      onBlur={(e) => handleTimeChange(post.id, e.target.value)}
                     />
                   </div>
                 ))}

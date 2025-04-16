@@ -78,7 +78,7 @@ export default function PreviewPage() {
 
   const schedulePosts = async () => {
     const batchSize = 5;
-    const delay = 500;
+    const delay = 200;
     let totalScheduled = 0;
 
     const chunks = Array.from({ length: Math.ceil(posts.length / batchSize) }, (_, i) =>
@@ -111,7 +111,7 @@ export default function PreviewPage() {
     }
 
     toast.success(`🎉 Scheduled ${totalScheduled} post(s)! Redirecting...`);
-    setTimeout(() => router.push("/"), 2000);
+    setTimeout(() => router.push("/db"), 2000);
   };
 
   const SchedulingControls = () => (
