@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
@@ -13,35 +13,67 @@ type ScheduledPost = {
   hasMention?: boolean;
 };
 
+const PAGE_SIZE = 10;
+
 export default function PreviewPage() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
-  const [error, setError] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [intervalHours, setIntervalHours] = useState<number>(24);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const observerRef = useRef<HTMLDivElement | null>(null);
+  const [offset, setOffset] = useState(0);
   const router = useRouter();
 
-  useEffect(() => {
-    async function fetchPosts() {
-      try {
-        const res = await fetch("/api/listUploads");
-        const data = await res.json();
-        if (data.success) {
-          const enriched = data.posts.map((post: ScheduledPost) => ({
-            ...post,
-            scheduledTime: post.scheduledTime || "",
-          }));
-          setPosts(enriched);
-        } else {
-          setError("Failed to load posts.");
-        }
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setError("Error loading posts.");
+  const fetchPosts = useCallback(async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/listUploads?offset=${offset}&limit=${PAGE_SIZE}`);
+      const data = await res.json();
+
+      if (data.success) {
+        const newPosts = data.posts.map((post: ScheduledPost) => ({
+          ...post,
+          scheduledTime: post.scheduledTime || "",
+        }));
+
+        setPosts((prev) => [...prev, ...newPosts]);
+        setOffset((prev) => prev + newPosts.length);
+        setHasMore(newPosts.length === PAGE_SIZE);
+      } else {
+        setError("Failed to load posts.");
+        setHasMore(false);
       }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError("Error loading posts.");
     }
 
+    setLoading(false);
+  }, [offset, loading, hasMore]);
+
+  useEffect(() => {
     fetchPosts();
   }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && hasMore && !loading) {
+        fetchPosts();
+      }
+    });
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [fetchPosts]);
 
   const handleTitleChange = (index: number, newTitle: string) => {
     const updated = [...posts];
@@ -61,24 +93,9 @@ export default function PreviewPage() {
     toast.success("Post removed");
   };
 
-  const generatePeriodicSchedule = () => {
-    if (!startDate) {
-      toast.error("Please select a start date & time.");
-      return;
-    }
-    const base = new Date(startDate).getTime();
-    const intervalMs = intervalHours * 60 * 60 * 1000;
-    const updated = posts.map((post, i) => ({
-      ...post,
-      scheduledTime: new Date(base + i * intervalMs).toISOString().slice(0, 16),
-    }));
-    setPosts(updated);
-    toast.success("Times generated");
-  };
-
   const schedulePosts = async () => {
     const batchSize = 5;
-    const delay = 500; // 1 second between batches
+    const delay = 500;
     let totalScheduled = 0;
 
     const chunks = Array.from({ length: Math.ceil(posts.length / batchSize) }, (_, i) =>
@@ -124,37 +141,6 @@ export default function PreviewPage() {
 
         {error && <p className="text-red-600 text-center mb-4">{error}</p>}
 
-        <div className="bg-white shadow-md rounded-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Periodic Scheduling</h2>
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full">
-              <label className="block mb-1 font-medium">Start Date & Time</label>
-              <input
-                type="datetime-local"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded"
-              />
-            </div>
-            <div className="w-full">
-              <label className="block mb-1 font-medium">Interval (hours)</label>
-              <input
-                type="number"
-                min={1}
-                value={intervalHours}
-                onChange={(e) => setIntervalHours(Number(e.target.value))}
-                className="w-full p-2 border border-gray-300 rounded"
-              />
-            </div>
-            <button
-              onClick={generatePeriodicSchedule}
-              className="bg-indigo-600 text-white px-6 py-2 rounded shadow hover:bg-indigo-700 self-end"
-            >
-              Generate
-            </button>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {posts.map((post, idx) => (
             <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
@@ -180,14 +166,12 @@ export default function PreviewPage() {
                   ))}
                 </Swiper>
               </div>
-              <label className="block text-sm font-semibold mb-1">Title</label>
               <textarea
                 rows={3}
                 value={post.title}
                 onChange={(e) => handleTitleChange(idx, e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
               />
-              <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
               <input
                 type="datetime-local"
                 value={post.scheduledTime || ""}
@@ -197,6 +181,9 @@ export default function PreviewPage() {
             </div>
           ))}
         </div>
+
+        {loading && <p className="text-center mt-4">Loading more posts...</p>}
+        <div ref={observerRef} className="h-10" />
 
         <div className="flex justify-center mt-10">
           <button
