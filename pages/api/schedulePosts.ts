@@ -24,41 +24,39 @@ export default async function handler(
       return res.status(400).json({ error: "Invalid data. Expected an array." });
     }
 
-    const createOperations = scheduledPosts.map(async (post) => {
-      const caption = post.title || post.description || "";
+    const createdPosts = [];
 
-      let imagesToUse: string[] = [];
-      if (Array.isArray(post.images) && post.images.length > 0) {
-        imagesToUse = post.images.slice(0, 4);
-      } else if (post.uri && typeof post.uri === "string") {
-        imagesToUse = [post.uri];
-      }
+    for (const post of scheduledPosts) {
+      const caption = post.title || post.description || "";
+      const scheduledTime = new Date(post.scheduledTime);
+
+      const imagesToUse: string[] = Array.isArray(post.images)
+        ? post.images.slice(0, 4)
+        : post.uri
+        ? [post.uri]
+        : [];
 
       if (imagesToUse.length === 0) {
-        throw new Error("Each post must contain at least one image.");
+        console.warn("Skipping post with no images");
+        continue;
       }
 
-      // Create the post and related images in a transaction
-      return await prisma.$transaction(async (tx) => {
-        const createdPost = await tx.scheduledPost.create({
-          data: {
-            title: caption,
-            scheduledTime: new Date(post.scheduledTime),
-          },
-        });
-
-        await tx.scheduledPostImage.createMany({
-          data: imagesToUse.map((uri) => ({
-            imageUri: uri,
-            postId: createdPost.id,
-          })),
-        });
-
-        return createdPost;
+      const createdPost = await prisma.scheduledPost.create({
+        data: {
+          title: caption,
+          scheduledTime,
+        },
       });
-    });
 
-    const createdPosts = await Promise.all(createOperations);
+      await prisma.scheduledPostImage.createMany({
+        data: imagesToUse.map((uri) => ({
+          imageUri: uri,
+          postId: createdPost.id,
+        })),
+      });
+
+      createdPosts.push(createdPost);
+    }
 
     return res.status(200).json({
       success: true,
