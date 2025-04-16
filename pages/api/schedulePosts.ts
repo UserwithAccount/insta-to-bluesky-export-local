@@ -24,18 +24,21 @@ export default async function handler(
       return res.status(400).json({ error: "Expected an array of posts" });
     }
 
-    // Limit max posts to avoid timeout
-    const safePosts = scheduledPosts.slice(0, 10); // tweak this as needed
+    const safePosts = scheduledPosts.slice(0, 10); // avoid timeout
     const createdPosts = [];
 
     for (const post of safePosts) {
       const caption = post.title || post.description || "";
-      const scheduledTime = new Date(post.scheduledTime);
+
+      // ✅ Parse and fallback for invalid scheduledTime
+      const parsed = new Date(post.scheduledTime);
+      const scheduledTime = isNaN(parsed.getTime()) ? new Date() : parsed;
+
       const imagesToUse = Array.isArray(post.images)
         ? post.images.slice(0, 4)
         : post.uri
-        ? [post.uri]
-        : [];
+          ? [post.uri]
+          : [];
 
       if (imagesToUse.length === 0) continue;
 
@@ -52,7 +55,7 @@ export default async function handler(
 
       createdPosts.push(createdPost);
 
-      // Add delay to avoid DB overload
+      // Throttle inserts
       await new Promise((r) => setTimeout(r, 250));
     }
 
