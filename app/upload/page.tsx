@@ -169,7 +169,7 @@ for (const [index, chunk] of chunks.entries()) {
 }
 
 addLog(`🎉 Total scheduled: ${totalScheduled}`);
-setTimeout(() => router.push("/db"), 2000);
+setTimeout(() => router.push("/preview"), 2000);
 
     setUploading(false);
   };
