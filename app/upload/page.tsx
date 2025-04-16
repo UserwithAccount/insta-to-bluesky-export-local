@@ -15,6 +15,35 @@ export default function UploadPage() {
   useEffect(() => scrollToBottom(), [logs]);
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
+  const fetchAllFileNames = async (): Promise<Set<string>> => {
+    const fileSet = new Set<string>();
+    let page = 0;
+    let pageSize = 100;
+    let keepFetching = true;
+
+    while (keepFetching) {
+      const { data, error } = await supabase.storage.from("uploads").list("", {
+        limit: pageSize,
+        offset: page * pageSize,
+        sortBy: { column: "name", order: "asc" },
+      });
+
+      if (error) {
+        console.error("Error fetching files:", error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        data.forEach((f) => fileSet.add(f.name));
+        page++;
+      } else {
+        keepFetching = false;
+      }
+    }
+
+    return fileSet;
+  };
+
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -30,18 +59,8 @@ export default function UploadPage() {
       return;
     }
 
-    // 🧠 Get list of existing files in 'uploads' bucket
-    const { data: allFiles, error: listError } = await supabase.storage.from("uploads").list("", {
-      limit: 9999,
-    });
-
-    if (listError) {
-      addLog(`❌ Failed to fetch existing files: ${listError.message}`);
-      setUploading(false);
-      return;
-    }
-
-    const existingFilenames = new Set(allFiles?.map((f) => f.name) || []);
+    const existingFilenames = await fetchAllFileNames();
+    console.log("Fetched files from Supabase:", existingFilenames);
 
     const jsonText = await jsonFile.text();
     const rawPosts = JSON.parse(jsonText);
@@ -84,7 +103,6 @@ export default function UploadPage() {
           continue;
         }
 
-        // ✅ Skip if file exists in preloaded list
         if (existingFilenames.has(fileName)) {
           addLog(`⏭️ Skipped (already exists): ${fileName}`);
         } else {
@@ -105,7 +123,6 @@ export default function UploadPage() {
             uploadedCount++;
           }
 
-          // Add uploaded file name to memory to prevent re-attempts
           existingFilenames.add(fileName);
         }
 
@@ -119,7 +136,6 @@ export default function UploadPage() {
       }
     }
 
-    // Upload uploadData.json
     const jsonBlob = new Blob([JSON.stringify(output, null, 2)], {
       type: "application/json",
     });
@@ -137,7 +153,6 @@ export default function UploadPage() {
       addLog("📦 uploadData.json saved to Supabase");
     }
 
-    // Send to API
     const res = await fetch("/api/schedulePosts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
