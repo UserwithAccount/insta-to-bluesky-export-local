@@ -22,7 +22,7 @@ export default function UploadPage() {
     let keepFetching = true;
 
     while (keepFetching) {
-      const { data, error } = await supabase.storage.from("uploads").list("", {
+      const { data, error } = await supabase.storage.from("uploads").list(undefined, {
         limit: pageSize,
         offset: page * pageSize,
         sortBy: { column: "name", order: "asc" },
