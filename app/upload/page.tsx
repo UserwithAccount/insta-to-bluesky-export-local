@@ -18,26 +18,26 @@ export default function UploadPage() {
   const fetchAllFileNames = async (): Promise<Set<string>> => {
     const fileSet = new Set<string>();
     let page = 0;
-    let pageSize = 100;
-    let keepFetching = true;
+    let perPage = 100;
+    let keepGoing = true;
 
-    while (keepFetching) {
-      const { data, error } = await supabase.storage.from("uploads").list(undefined, {
-        limit: pageSize,
-        offset: page * pageSize,
+    while (keepGoing) {
+      const { data, error } = await supabase.storage.from("uploads").list("", {
+        limit: perPage,
+        offset: page * perPage,
         sortBy: { column: "name", order: "asc" },
       });
 
       if (error) {
-        console.error("Error fetching files:", error);
-        break;
-      }
-
-      if (data && data.length > 0) {
-        data.forEach((f) => fileSet.add(f.name));
-        page++;
+        console.error("Error listing files:", error);
+        keepGoing = false;
       } else {
-        keepFetching = false;
+        if (data.length === 0) {
+          keepGoing = false;
+        } else {
+          data.forEach((f) => fileSet.add(f.name));
+          page++;
+        }
       }
     }
 
