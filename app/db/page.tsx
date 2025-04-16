@@ -33,15 +33,7 @@ export default function DbPage() {
       const data = await res.json();
       if (data.success) {
         setPosts(data.posts);
-
-        const grouped: Record<string, DbPost[]> = {};
-        data.posts.forEach((post: DbPost) => {
-          const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
-          const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-          if (!grouped[week]) grouped[week] = [];
-          grouped[week].push(post);
-        });
-        setWeekGroups(grouped);
+        regroup(data.posts);
       } else {
         setError("Failed to fetch DB posts.");
       }
@@ -49,6 +41,17 @@ export default function DbPage() {
       console.error("DB fetch error:", err);
       setError("Failed to fetch DB posts.");
     }
+  };
+
+  const regroup = (posts: DbPost[]) => {
+    const grouped: Record<string, DbPost[]> = {};
+    posts.forEach((post: DbPost) => {
+      const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
+      const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      if (!grouped[week]) grouped[week] = [];
+      grouped[week].push(post);
+    });
+    setWeekGroups(grouped);
   };
 
   const toggleWeek = (week: string) => {
@@ -61,15 +64,17 @@ export default function DbPage() {
 
   const commitTitleChange = async (id: number) => {
     const newTitle = editingTitles[id];
-    setEditingIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
 
-    setPosts((prev) =>
-      prev.map((post) => (post.id === id ? { ...post, title: newTitle } : post))
-    );
+    // Update local UI
+    const updated = posts.map((p) => (p.id === id ? { ...p, title: newTitle } : p));
+    setPosts(updated);
+    regroup(updated);
+
+    setEditingIds((prev) => {
+      const copy = new Set(prev);
+      copy.delete(id);
+      return copy;
+    });
 
     try {
       await fetch("/api/dbPosts", {
@@ -83,9 +88,9 @@ export default function DbPage() {
   };
 
   const handleTimeChange = async (id: number, newTime: string) => {
-    setPosts((prev) =>
-      prev.map((post) => (post.id === id ? { ...post, scheduledTime: newTime } : post))
-    );
+    const updated = posts.map((p) => (p.id === id ? { ...p, scheduledTime: newTime } : p));
+    setPosts(updated);
+    regroup(updated);
 
     try {
       await fetch("/api/dbPosts", {
