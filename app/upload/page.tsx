@@ -16,9 +16,13 @@ export default function UploadPage() {
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
   const fetchAllFileNames = async (): Promise<Set<string>> => {
-    const { data, error } = await supabase.rpc("get_all_filenames", {
-      bucket: "uploads",
-    });
+    const bucket = "your-bucket-name"; // Replace with your actual bucket name
+    let { data, error } = await supabase
+  .rpc('get_all_filenames', {
+    bucket: "uploads"
+  })
+if (error) console.error(error)
+else console.log(data)
 
     if (error) {
       console.error("Error fetching filenames from SQL function:", error.message);
