@@ -131,7 +131,7 @@ else console.log(data)
 
     const { error: jsonError } = await supabase.storage
       .from("uploads")
-      .upload(`uploadData-${Date.now()}.json`, jsonBlob, {
+      .upload(`uploadData.json`, jsonBlob, {
         upsert: true,
         contentType: "application/json",
       });
