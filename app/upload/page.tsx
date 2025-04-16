@@ -1,8 +1,8 @@
-// pages/upload/page.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
@@ -21,32 +21,117 @@ export default function UploadPage() {
 
     setUploading(true);
     setLogs(["📂 Upload started..."]);
+    let uploadedCount = 0;
 
-    const formData = new FormData();
+    const jsonFile = Array.from(files).find((f) => f.name.endsWith(".json"));
+    if (!jsonFile) {
+      addLog("❌ JSON file missing.");
+      return setUploading(false);
+    }
+
+    const jsonText = await jsonFile.text();
+    const rawPosts = JSON.parse(jsonText);
+
+    const imageMap = new Map<string, File>();
     for (const file of Array.from(files)) {
-      formData.append("files", file, file.webkitRelativePath || file.name);
+      if (file !== jsonFile) imageMap.set(file.name, file);
     }
 
-    const uploadId = Date.now().toString();
-    try {
-      const res = await fetch(`/api/upload?uploadId=${uploadId}`, {
-        method: "POST",
-        body: formData,
-      });
+    const output: {
+      postId: string;
+      title: string;
+      hasMention: boolean;
+      images: string[];
+    }[] = [];
 
-      const data = await res.json();
-      if (res.ok) {
-        addLog(`✅ Upload complete. ${data.count} posts uploaded.`);
-        setTimeout(() => router.push("/preview"), 1500);
-      } else {
-        addLog(`❌ Error: ${data.error}`);
+    for (const post of rawPosts) {
+      const media = Array.isArray(post.media) ? post.media : [];
+      const postId =
+        post.creation_timestamp?.toString() ||
+        media[0]?.creation_timestamp?.toString() ||
+        crypto.randomUUID();
+
+      const rawTitle =
+        post.title?.trim() ||
+        media.find((m: any) => m.title?.trim())?.title?.trim() ||
+        "Untitled";
+
+      const title = decodeURIComponent(escape(rawTitle)).replace(/\\n/g, "\n");
+      const hasMention = /@\w+/.test(title);
+      const imageUris: string[] = [];
+
+      for (const item of media) {
+        const fileName = item.uri.split("/").pop();
+        if (!fileName) continue;
+
+        const file = imageMap.get(fileName);
+        if (!file) {
+          addLog(`⚠️ Missing file: ${fileName}`);
+          continue;
+        }
+
+        const { data: existing } = await supabase.storage.from("uploads").list("", {
+          search: fileName,
+        });
+
+        if (existing?.some((f) => f.name === fileName)) {
+          addLog(`⏭️ Skipped (already exists): ${fileName}`);
+        } else {
+          const { error } = await supabase.storage
+            .from("uploads")
+            .upload(fileName, file, {
+              upsert: false,
+              contentType: file.type,
+            });
+
+          if (error) {
+            addLog(`❌ Failed: ${fileName}`);
+            continue;
+          } else {
+            addLog(`✅ Uploaded: ${fileName}`);
+            uploadedCount++;
+          }
+        }
+
+        const publicUrl = supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+        imageUris.push(publicUrl);
+        setProgress(Math.round((uploadedCount / files.length) * 100));
       }
-    } catch (err) {
-      addLog("❌ Upload failed.");
-      console.error(err);
-    } finally {
-      setUploading(false);
+
+      if (imageUris.length > 0) {
+        output.push({ postId, title, hasMention, images: imageUris });
+      }
     }
+
+    // Save uploadData.json (optional)
+    const jsonBuffer = new Blob([JSON.stringify(output, null, 2)], {
+      type: "application/json",
+    });
+    const { error: jsonError } = await supabase.storage
+      .from("uploads")
+      .upload("uploadData.json", jsonBuffer, { upsert: true });
+
+    if (jsonError) {
+      addLog("❌ Failed to upload uploadData.json");
+    } else {
+      addLog("📦 uploadData.json saved to Supabase");
+    }
+
+    // Send to API
+    const res = await fetch("/api/schedulePosts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(output),
+    });
+
+    if (res.ok) {
+      addLog("🎉 Scheduled successfully");
+      setTimeout(() => router.push("/db"), 1500);
+    } else {
+      addLog("❌ Failed to schedule posts");
+    }
+
+    setUploading(false);
   };
 
   return (
@@ -60,11 +145,7 @@ export default function UploadPage() {
           <input
             type="file"
             name="files"
-            {...({
-              webkitdirectory: "true",
-              directory: "true",
-              multiple: true,
-            } as React.HTMLProps<HTMLInputElement>)}
+            {...({ webkitdirectory: "true", directory: "true", multiple: true } as any)}
             onChange={handleFolderUpload}
             className="hidden"
           />
