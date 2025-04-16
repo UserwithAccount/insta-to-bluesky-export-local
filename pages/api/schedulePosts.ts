@@ -1,5 +1,3 @@
-// pages/api/schedulePosts.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 
@@ -20,22 +18,17 @@ export default async function handler(
   }
 
   try {
-    console.log("Incoming request body:", req.body);
     const scheduledPosts: ScheduledPostInput[] = req.body;
 
     if (!Array.isArray(scheduledPosts)) {
-      return res
-        .status(400)
-        .json({ error: "Invalid data. Expected an array." });
+      return res.status(400).json({ error: "Invalid data. Expected an array." });
     }
 
-    const createdPosts = [];
-
-    for (const post of scheduledPosts) {
+    const createOperations = scheduledPosts.map(async (post) => {
       const caption = post.title || post.description || "";
 
       let imagesToUse: string[] = [];
-      if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+      if (Array.isArray(post.images) && post.images.length > 0) {
         imagesToUse = post.images.slice(0, 4);
       } else if (post.uri && typeof post.uri === "string") {
         imagesToUse = [post.uri];
@@ -45,29 +38,27 @@ export default async function handler(
         throw new Error("Each post must contain at least one image.");
       }
 
-      // Create the post
-      const createdPost = await prisma.scheduledPost.create({
-        data: {
-          title: caption,
-          scheduledTime: new Date(post.scheduledTime),
-        },
-      });
-
-      // Small delay to prevent database overload on Supabase free tier
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Create image entries
-      for (const uri of imagesToUse) {
-        await prisma.scheduledPostImage.create({
+      // Create the post and related images in a transaction
+      return await prisma.$transaction(async (tx) => {
+        const createdPost = await tx.scheduledPost.create({
           data: {
-            imageUri: uri,
-            postId: createdPost.id,
+            title: caption,
+            scheduledTime: new Date(post.scheduledTime),
           },
         });
-      }
 
-      createdPosts.push(createdPost);
-    }
+        await tx.scheduledPostImage.createMany({
+          data: imagesToUse.map((uri) => ({
+            imageUri: uri,
+            postId: createdPost.id,
+          })),
+        });
+
+        return createdPost;
+      });
+    });
+
+    const createdPosts = await Promise.all(createOperations);
 
     return res.status(200).json({
       success: true,
