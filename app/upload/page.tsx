@@ -142,18 +142,34 @@ else console.log(data)
       addLog("📦 uploadData.json saved to Supabase");
     }
 
-    const res = await fetch("/api/schedulePosts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(output),
-    });
+    const batchSize = 5;
+const chunks = Array.from({ length: Math.ceil(output.length / batchSize) }, (_, i) =>
+  output.slice(i * batchSize, i * batchSize + batchSize)
+);
 
-    if (res.ok) {
-      addLog("🎉 Scheduled successfully");
-      setTimeout(() => router.push("/db"), 1500);
-    } else {
-      addLog("❌ Failed to schedule posts");
-    }
+let totalScheduled = 0;
+
+for (const [index, chunk] of chunks.entries()) {
+  const res = await fetch("/api/schedulePosts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(chunk),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    addLog(`❌ Batch ${index + 1} failed: ${data.error || "Unknown error"}`);
+    break;
+  }
+
+  totalScheduled += data.count;
+  addLog(`✅ Batch ${index + 1}: ${data.count} post(s) scheduled`);
+  await new Promise((r) => setTimeout(r, 500)); // throttle a bit
+}
+
+addLog(`🎉 Total scheduled: ${totalScheduled}`);
+setTimeout(() => router.push("/db"), 2000);
 
     setUploading(false);
   };
