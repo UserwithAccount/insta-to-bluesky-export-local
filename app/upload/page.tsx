@@ -103,13 +103,17 @@ export default function UploadPage() {
       }
     }
 
-    // Save uploadData.json (optional)
-    const jsonBuffer = new Blob([JSON.stringify(output, null, 2)], {
+    // Save uploadData.json using Supabase client from frontend
+    const jsonBlob = new Blob([JSON.stringify(output, null, 2)], {
       type: "application/json",
     });
+
     const { error: jsonError } = await supabase.storage
       .from("uploads")
-      .upload("uploadData.json", jsonBuffer, { upsert: true });
+      .upload(`uploadData-${Date.now()}.json`, jsonBlob, {
+        upsert: true,
+        contentType: "application/json",
+      });
 
     if (jsonError) {
       addLog("❌ Failed to upload uploadData.json");
