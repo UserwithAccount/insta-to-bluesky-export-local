@@ -24,13 +24,12 @@ export default async function handler(
       return res.status(400).json({ error: "Expected an array of posts" });
     }
 
-    const safePosts = scheduledPosts.slice(0, 10); // avoid timeout
     const createdPosts = [];
 
-    for (const post of safePosts) {
+    for (const post of scheduledPosts) {
       const caption = post.title || post.description || "";
 
-      // ✅ Parse and fallback for invalid scheduledTime
+      // ✅ Safely parse scheduledTime
       const parsed = new Date(post.scheduledTime);
       const scheduledTime = isNaN(parsed.getTime()) ? new Date() : parsed;
 
@@ -54,9 +53,6 @@ export default async function handler(
       });
 
       createdPosts.push(createdPost);
-
-      // Throttle inserts
-      await new Promise((r) => setTimeout(r, 250));
     }
 
     return res.status(200).json({
