@@ -16,13 +16,7 @@ export default function UploadPage() {
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
   const fetchAllFileNames = async (): Promise<Set<string>> => {
-    const bucket = "your-bucket-name"; // Replace with your actual bucket name
-    let { data, error } = await supabase
-  .rpc('get_all_filenames', {
-    bucket: "uploads"
-  })
-if (error) console.error(error)
-else console.log(data)
+    let { data, error } = await supabase.rpc("get_all_filenames", { bucket: "uploads" });
 
     if (error) {
       console.error("Error fetching filenames from SQL function:", error.message);
@@ -142,35 +136,7 @@ else console.log(data)
       addLog("📦 uploadData.json saved to Supabase");
     }
 
-    const batchSize = 5;
-const chunks = Array.from({ length: Math.ceil(output.length / batchSize) }, (_, i) =>
-  output.slice(i * batchSize, i * batchSize + batchSize)
-);
-
-let totalScheduled = 0;
-
-for (const [index, chunk] of chunks.entries()) {
-  const res = await fetch("/api/schedulePosts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(chunk),
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    addLog(`❌ Batch ${index + 1} failed: ${data.error || "Unknown error"}`);
-    break;
-  }
-
-  totalScheduled += data.count;
-  addLog(`✅ Batch ${index + 1}: ${data.count} post(s) scheduled`);
-  await new Promise((r) => setTimeout(r, 500)); // throttle a bit
-}
-
-addLog(`🎉 Total scheduled: ${totalScheduled}`);
-setTimeout(() => router.push("/preview"), 2000);
-
+    setTimeout(() => router.push("/preview"), 1500);
     setUploading(false);
   };
 
