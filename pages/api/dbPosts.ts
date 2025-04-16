@@ -1,11 +1,9 @@
 // pages/api/dbPosts.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
-import { supabase } from "@/lib/supabase"; // Import the shared Supabase client
+import { supabase } from "@/lib/supabase"; // uses service role key
 
 const prisma = new PrismaClient();
-
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
@@ -59,9 +57,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { postId: parseInt(id) },
       });
 
-      for (const img of images) {
-        const path = img.imageUri.replace(/^https:\/\/[^\/]+\/storage\/v1\/object\/public\//, "");
-        await supabase.storage.from("uploads").remove([path]);
+      const pathsToDelete = images.map((img) =>
+        img.imageUri.replace(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/`,
+          ""
+        )
+      );
+
+      if (pathsToDelete.length > 0) {
+        const { error: storageError } = await supabase.storage.from("uploads").remove(pathsToDelete);
+        if (storageError) {
+          console.error("Storage deletion error:", storageError);
+          return res.status(500).json({ error: "Failed to delete images from storage" });
+        }
       }
 
       await prisma.scheduledPostImage.deleteMany({ where: { postId: parseInt(id) } });
