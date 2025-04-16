@@ -44,6 +44,9 @@ export default function UploadPage() {
       images: string[];
     }[] = [];
 
+    const { data: existingFiles } = await supabase.storage.from("uploads").list("", { limit: 1000 });
+    const existingNames = existingFiles?.map((f) => f.name) || [];
+
     for (const post of rawPosts) {
       const media = Array.isArray(post.media) ? post.media : [];
       const postId =
@@ -70,11 +73,7 @@ export default function UploadPage() {
           continue;
         }
 
-        const { data: existing } = await supabase.storage.from("uploads").list("", {
-          search: fileName,
-        });
-
-        if (existing?.some((f) => f.name === fileName)) {
+        if (existingNames.includes(fileName)) {
           addLog(`⏭️ Skipped (already exists): ${fileName}`);
         } else {
           const { error } = await supabase.storage
@@ -103,7 +102,6 @@ export default function UploadPage() {
       }
     }
 
-    // Save uploadData.json using Supabase client from frontend
     const jsonBlob = new Blob([JSON.stringify(output, null, 2)], {
       type: "application/json",
     });
@@ -121,7 +119,6 @@ export default function UploadPage() {
       addLog("📦 uploadData.json saved to Supabase");
     }
 
-    // Send to API
     const res = await fetch("/api/schedulePosts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
