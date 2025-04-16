@@ -26,15 +26,22 @@ export default function UploadPage() {
     const jsonFile = Array.from(files).find((f) => f.name.endsWith(".json"));
     if (!jsonFile) {
       addLog("❌ JSON file missing.");
-      return setUploading(false);
+      setUploading(false);
+      return;
     }
 
-    // 🧠 Fetch all existing files in the 'uploads' bucket once
+    // 🧠 Get list of existing files in 'uploads' bucket
     const { data: allFiles, error: listError } = await supabase.storage.from("uploads").list("", {
       limit: 9999,
     });
 
-    const existingFilenames = allFiles?.map((f) => f.name) || [];
+    if (listError) {
+      addLog(`❌ Failed to fetch existing files: ${listError.message}`);
+      setUploading(false);
+      return;
+    }
+
+    const existingFilenames = new Set(allFiles?.map((f) => f.name) || []);
 
     const jsonText = await jsonFile.text();
     const rawPosts = JSON.parse(jsonText);
@@ -77,37 +84,29 @@ export default function UploadPage() {
           continue;
         }
 
-        // ✅ Check if file already exists in memory
-        if (existingFilenames.includes(fileName)) {
+        // ✅ Skip if file exists in preloaded list
+        if (existingFilenames.has(fileName)) {
           addLog(`⏭️ Skipped (already exists): ${fileName}`);
         } else {
-          try {
-            const { error } = await supabase.storage
-              .from("uploads")
-              .upload(fileName, file, {
-                upsert: false,
-                contentType: file.type,
-              });
+          const { error } = await supabase.storage.from("uploads").upload(fileName, file, {
+            upsert: false,
+            contentType: file.type,
+          });
 
-            if (error) {
-              // Catch 409 conflict (duplicate) and skip gracefully
-              if (error.message.includes("resource already exists")) {
-                addLog(`⏭️ Skipped (already exists): ${fileName}`);
-              } else {
-                addLog(`❌ Failed: ${fileName} (${error.message})`);
-              }
-            } else {
-              addLog(`✅ Uploaded: ${fileName}`);
-              uploadedCount++;
-            }
-          } catch (err: any) {
-            if (err?.message?.includes("resource already exists")) {
+          if (error) {
+            if (error.message.includes("resource already exists")) {
               addLog(`⏭️ Skipped (already exists): ${fileName}`);
             } else {
-              console.error("Upload failed:", err);
-              addLog(`❌ Upload error: ${fileName}`);
+              addLog(`❌ Failed: ${fileName} (${error.message})`);
+              continue;
             }
+          } else {
+            addLog(`✅ Uploaded: ${fileName}`);
+            uploadedCount++;
           }
+
+          // Add uploaded file name to memory to prevent re-attempts
+          existingFilenames.add(fileName);
         }
 
         const publicUrl = supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
