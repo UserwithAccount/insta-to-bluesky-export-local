@@ -12,8 +12,6 @@ export const config = {
   },
 };
 
-
-
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).any();
 
@@ -28,9 +26,7 @@ function runMiddleware(req: NextApiRequest, res: NextApiResponse, fn: Function) 
 
 function decodeUtf8String(input: string): string {
   try {
-    const decoder = new TextDecoder("utf-8");
-    const bytes = new Uint8Array([...input].map((c) => c.charCodeAt(0)));
-    return decoder.decode(bytes);
+    return decodeURIComponent(escape(input));
   } catch {
     return input;
   }
