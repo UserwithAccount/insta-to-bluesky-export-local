@@ -16,32 +16,17 @@ export default function UploadPage() {
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
   const fetchAllFileNames = async (): Promise<Set<string>> => {
-    const fileSet = new Set<string>();
-    let page = 0;
-    let perPage = 100;
-    let keepGoing = true;
+    const { data, error } = await supabase.rpc("get_all_filenames", {
+      bucket: "uploads",
+    });
 
-    while (keepGoing) {
-      const { data, error } = await supabase.storage.from("uploads").list("", {
-        limit: perPage,
-        offset: page * perPage,
-        sortBy: { column: "name", order: "asc" },
-      });
-
-      if (error) {
-        console.error("Error listing files:", error);
-        keepGoing = false;
-      } else {
-        if (data.length === 0) {
-          keepGoing = false;
-        } else {
-          data.forEach((f) => fileSet.add(f.name));
-          page++;
-        }
-      }
+    if (error) {
+      console.error("Error fetching filenames from SQL function:", error.message);
+      return new Set();
     }
 
-    return fileSet;
+    const filenames = data?.map((entry: { name: string }) => entry.name) || [];
+    return new Set(filenames);
   };
 
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
