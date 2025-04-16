@@ -26,23 +26,21 @@ export default function DbPage() {
     fetchPosts();
   }, []);
 
-  useEffect(() => {
-    const grouped: Record<string, DbPost[]> = {};
-    posts.forEach((post: DbPost) => {
-      const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
-      const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-      if (!grouped[week]) grouped[week] = [];
-      grouped[week].push(post);
-    });
-    setWeekGroups(grouped);
-  }, [posts]);
-
   const fetchPosts = async () => {
     try {
       const res = await fetch("/api/dbPosts");
       const data = await res.json();
       if (data.success) {
         setPosts(data.posts);
+
+        const grouped: Record<string, DbPost[]> = {};
+        data.posts.forEach((post: DbPost) => {
+          const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
+          const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+          if (!grouped[week]) grouped[week] = [];
+          grouped[week].push(post);
+        });
+        setWeekGroups(grouped);
       } else {
         setError("Failed to fetch DB posts.");
       }
@@ -56,11 +54,15 @@ export default function DbPage() {
     setExpandedWeeks((prev) => ({ ...prev, [week]: !prev[week] }));
   };
 
-  const handleTitleChange = async (id: number, newTitle: string) => {
+  const handleTitleInputChange = (id: number, newTitle: string) => {
     setPosts((prev) =>
-      prev.map((post) =>
-        post.id === id ? { ...post, title: newTitle, editing: false } : post
-      )
+      prev.map((p) => (p.id === id ? { ...p, title: newTitle } : p))
+    );
+  };
+
+  const handleTitleBlur = async (id: number, newTitle: string) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, editing: false } : p))
     );
 
     try {
@@ -75,11 +77,10 @@ export default function DbPage() {
   };
 
   const handleTimeChange = async (id: number, newTime: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === id ? { ...post, scheduledTime: newTime } : post
-      )
+    const updatedPosts = posts.map((post) =>
+      post.id === id ? { ...post, scheduledTime: newTime } : post
     );
+    setPosts(updatedPosts);
 
     try {
       await fetch("/api/dbPosts", {
@@ -192,21 +193,17 @@ export default function DbPage() {
                           )
                         }
                       >
-                        {post.title || <span className="text-zinc-400 italic">Click to edit</span>}
+                        {post.title || (
+                          <span className="text-zinc-400 italic">Click to edit</span>
+                        )}
                       </div>
                     ) : (
                       <textarea
                         rows={4}
                         className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded mb-3 bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
                         value={post.title}
-                        onChange={(e) =>
-                          setPosts((prev) =>
-                            prev.map((p) =>
-                              p.id === post.id ? { ...p, title: e.target.value } : p
-                            )
-                          )
-                        }
-                        onBlur={(e) => handleTitleChange(post.id, e.target.value)}
+                        onChange={(e) => handleTitleInputChange(post.id, e.target.value)}
+                        onBlur={(e) => handleTitleBlur(post.id, e.target.value)}
                         autoFocus
                       />
                     )}
