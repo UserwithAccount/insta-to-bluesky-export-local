@@ -6,7 +6,6 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import { FaExclamationTriangle } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
-import { supabase } from "@/lib/supabaseClient"; // Import the shared Supabase client
 
 type DbPost = {
   id: number;
@@ -14,6 +13,7 @@ type DbPost = {
   scheduledTime?: string;
   images: string[];
   posted: boolean;
+  editing?: boolean;
 };
 
 export default function DbPage() {
@@ -31,21 +31,10 @@ export default function DbPage() {
       const res = await fetch("/api/dbPosts");
       const data = await res.json();
       if (data.success) {
-        const enrichedPosts: DbPost[] = await Promise.all(
-          data.posts.map(async (post: DbPost) => {
-            const images = await Promise.all(
-              post.images.map(async (uri) => {
-                const { data } = supabase.storage.from("images").getPublicUrl(uri);
-                return data.publicUrl;
-              })
-            );
-            return { ...post, images };
-          })
-        );
+        setPosts(data.posts);
 
-        setPosts(enrichedPosts);
         const grouped: Record<string, DbPost[]> = {};
-        enrichedPosts.forEach((post: DbPost) => {
+        data.posts.forEach((post: DbPost) => {
           const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
           const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
           if (!grouped[week]) grouped[week] = [];
@@ -151,7 +140,10 @@ export default function DbPage() {
             {expandedWeeks[week] && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {weekPosts.map((post) => (
-                  <div key={post.id} className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 relative">
+                  <div
+                    key={post.id}
+                    className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 relative"
+                  >
                     <button
                       onClick={() => removePost(post.id)}
                       className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700 z-10"
@@ -185,13 +177,35 @@ export default function DbPage() {
                     <label className="block text-sm font-semibold mb-1 text-zinc-800 dark:text-zinc-200">
                       Title
                     </label>
-                    <textarea
-                      rows={4}
-                      className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded mb-3 bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
-                      value={post.title}
-                      onChange={(e) => handleTitleChange(post.id, e.target.value)}
-                      onBlur={(e) => handleTitleChange(post.id, e.target.value)}
-                    />
+                    {!post.editing ? (
+                      <div
+                        className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded mb-3 bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white whitespace-pre-wrap cursor-pointer"
+                        onClick={() =>
+                          setPosts((prev) =>
+                            prev.map((p) =>
+                              p.id === post.id ? { ...p, editing: true } : p
+                            )
+                          )
+                        }
+                      >
+                        {post.title || <span className="text-zinc-400 italic">Click to edit</span>}
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={4}
+                        className="w-full p-2 border border-gray-300 dark:border-zinc-600 rounded mb-3 bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+                        value={post.title}
+                        onChange={(e) => handleTitleChange(post.id, e.target.value)}
+                        onBlur={() =>
+                          setPosts((prev) =>
+                            prev.map((p) =>
+                              p.id === post.id ? { ...p, editing: false } : p
+                            )
+                          )
+                        }
+                        autoFocus
+                      />
+                    )}
                     <label className="block text-sm font-semibold mb-1 text-zinc-800 dark:text-zinc-200">
                       Scheduled Time
                     </label>

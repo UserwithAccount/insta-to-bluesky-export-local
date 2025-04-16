@@ -78,7 +78,7 @@ export default function PreviewPage() {
 
   const schedulePosts = async () => {
     const batchSize = 5;
-    const delay = 1000; // 1 second between batches
+    const delay = 500; // 1 second between batches
     let totalScheduled = 0;
 
     const chunks = Array.from({ length: Math.ceil(posts.length / batchSize) }, (_, i) =>
