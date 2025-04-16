@@ -21,31 +21,26 @@ export default async function handler(
     const scheduledPosts: ScheduledPostInput[] = req.body;
 
     if (!Array.isArray(scheduledPosts)) {
-      return res.status(400).json({ error: "Invalid data. Expected an array." });
+      return res.status(400).json({ error: "Expected an array of posts" });
     }
 
+    // Limit max posts to avoid timeout
+    const safePosts = scheduledPosts.slice(0, 10); // tweak this as needed
     const createdPosts = [];
 
-    for (const post of scheduledPosts) {
+    for (const post of safePosts) {
       const caption = post.title || post.description || "";
       const scheduledTime = new Date(post.scheduledTime);
-
-      const imagesToUse: string[] = Array.isArray(post.images)
+      const imagesToUse = Array.isArray(post.images)
         ? post.images.slice(0, 4)
         : post.uri
         ? [post.uri]
         : [];
 
-      if (imagesToUse.length === 0) {
-        console.warn("Skipping post with no images");
-        continue;
-      }
+      if (imagesToUse.length === 0) continue;
 
       const createdPost = await prisma.scheduledPost.create({
-        data: {
-          title: caption,
-          scheduledTime,
-        },
+        data: { title: caption, scheduledTime },
       });
 
       await prisma.scheduledPostImage.createMany({
@@ -56,15 +51,17 @@ export default async function handler(
       });
 
       createdPosts.push(createdPost);
+
+      // Add delay to avoid DB overload
+      await new Promise((r) => setTimeout(r, 250));
     }
 
     return res.status(200).json({
       success: true,
       count: createdPosts.length,
-      posts: createdPosts,
     });
   } catch (error: any) {
-    console.error("Error scheduling posts:", error);
+    console.error("Scheduling error:", error);
     return res.status(500).json({
       error: "Failed to schedule posts",
       details: error.message || String(error),

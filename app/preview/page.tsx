@@ -77,23 +77,41 @@ export default function PreviewPage() {
   };
 
   const schedulePosts = async () => {
-    try {
-      const res = await fetch("/api/schedulePosts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(posts),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`Scheduled ${data.count} posts!`);
-        setTimeout(() => router.push("/"), 1500);
-      } else {
-        toast.error(data.error);
+    const batchSize = 5;
+    const delay = 1000; // 1 second between batches
+    let totalScheduled = 0;
+
+    const chunks = Array.from({ length: Math.ceil(posts.length / batchSize) }, (_, i) =>
+      posts.slice(i * batchSize, i * batchSize + batchSize)
+    );
+
+    for (const [index, chunk] of chunks.entries()) {
+      try {
+        const res = await fetch("/api/schedulePosts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(chunk),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          toast.error(`Batch ${index + 1} failed: ${data.error || "Unknown error"}`);
+          break;
+        }
+
+        totalScheduled += data.count;
+        toast.success(`✅ Batch ${index + 1}: ${data.count} post(s)`);
+        await new Promise((r) => setTimeout(r, delay));
+      } catch (err) {
+        console.error("Error during batch scheduling:", err);
+        toast.error(`❌ Error during batch ${index + 1}`);
+        break;
       }
-    } catch (err) {
-      console.error("Schedule error:", err);
-      toast.error("Scheduling failed");
     }
+
+    toast.success(`🎉 Scheduled ${totalScheduled} post(s)! Redirecting...`);
+    setTimeout(() => router.push("/"), 2000);
   };
 
   return (
@@ -140,11 +158,8 @@ export default function PreviewPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {posts.map((post, idx) => (
             <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
-              {/* Controls above image */}
               <div className="flex justify-between mb-2 items-center">
-                {post.hasMention && (
-                  <span className="text-yellow-500 text-xl">⚠️</span>
-                )}
+                {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
                 <button
                   onClick={() => removePost(idx)}
                   className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
@@ -152,8 +167,6 @@ export default function PreviewPage() {
                   Remove
                 </button>
               </div>
-
-              {/* Carousel */}
               <div className="w-full mb-4 rounded overflow-hidden" style={{ aspectRatio: "4 / 3" }}>
                 <Swiper spaceBetween={10}>
                   {post.images.map((img, i) => (
@@ -167,7 +180,6 @@ export default function PreviewPage() {
                   ))}
                 </Swiper>
               </div>
-
               <label className="block text-sm font-semibold mb-1">Title</label>
               <textarea
                 rows={3}
@@ -175,7 +187,6 @@ export default function PreviewPage() {
                 onChange={(e) => handleTitleChange(idx, e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
               />
-
               <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
               <input
                 type="datetime-local"
