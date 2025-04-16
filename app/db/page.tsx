@@ -26,21 +26,23 @@ export default function DbPage() {
     fetchPosts();
   }, []);
 
+  useEffect(() => {
+    const grouped: Record<string, DbPost[]> = {};
+    posts.forEach((post: DbPost) => {
+      const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
+      const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      if (!grouped[week]) grouped[week] = [];
+      grouped[week].push(post);
+    });
+    setWeekGroups(grouped);
+  }, [posts]);
+
   const fetchPosts = async () => {
     try {
       const res = await fetch("/api/dbPosts");
       const data = await res.json();
       if (data.success) {
         setPosts(data.posts);
-
-        const grouped: Record<string, DbPost[]> = {};
-        data.posts.forEach((post: DbPost) => {
-          const date = post.scheduledTime ? new Date(post.scheduledTime) : new Date();
-          const week = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-          if (!grouped[week]) grouped[week] = [];
-          grouped[week].push(post);
-        });
-        setWeekGroups(grouped);
       } else {
         setError("Failed to fetch DB posts.");
       }
@@ -55,10 +57,11 @@ export default function DbPage() {
   };
 
   const handleTitleChange = async (id: number, newTitle: string) => {
-    const updatedPosts = posts.map((post) =>
-      post.id === id ? { ...post, title: newTitle, editing: false } : post
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === id ? { ...post, title: newTitle, editing: false } : post
+      )
     );
-    setPosts(updatedPosts);
 
     try {
       await fetch("/api/dbPosts", {
@@ -72,10 +75,11 @@ export default function DbPage() {
   };
 
   const handleTimeChange = async (id: number, newTime: string) => {
-    const updatedPosts = posts.map((post) =>
-      post.id === id ? { ...post, scheduledTime: newTime } : post
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === id ? { ...post, scheduledTime: newTime } : post
+      )
     );
-    setPosts(updatedPosts);
 
     try {
       await fetch("/api/dbPosts", {
