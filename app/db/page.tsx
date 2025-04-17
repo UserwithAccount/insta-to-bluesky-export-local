@@ -32,8 +32,10 @@ export default function DbPage() {
       const res = await fetch("/api/dbPosts");
       const data = await res.json();
       if (data.success) {
-        setPosts(data.posts);
-        regroup(data.posts);
+        // Filter out posted posts
+        const unposted = data.posts.filter((p: DbPost) => !p.posted);
+        setPosts(unposted);
+        regroup(unposted);
       } else {
         setError("Failed to fetch DB posts.");
       }
@@ -64,12 +66,9 @@ export default function DbPage() {
 
   const commitTitleChange = async (id: number) => {
     const newTitle = editingTitles[id];
-
-    // Update local UI
     const updated = posts.map((p) => (p.id === id ? { ...p, title: newTitle } : p));
     setPosts(updated);
     regroup(updated);
-
     setEditingIds((prev) => {
       const copy = new Set(prev);
       copy.delete(id);
@@ -123,12 +122,10 @@ export default function DbPage() {
       const res = await fetch(`/api/postToBluesky?id=${id}`, { method: "POST" });
       if (res.ok) {
         toast.success("Post sent to Bluesky");
-  
-        // Immediately remove post from state
-        setPosts((prev) => prev.filter((post) => post.id !== id));
-  
-        // Optionally refetch from DB to stay fully in sync
-        fetchPosts();
+        // Remove the post from local state
+        const updated = posts.filter((post) => post.id !== id);
+        setPosts(updated);
+        regroup(updated);
       } else {
         toast.error("Failed to send post");
       }
