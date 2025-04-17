@@ -136,7 +136,7 @@ export default function UploadPage() {
       addLog("📦 uploadData.json saved to Supabase");
     }
 
-    router.push("/preview");
+    setTimeout(() => router.push("/preview"), 1500);
     setUploading(false);
   };
 
