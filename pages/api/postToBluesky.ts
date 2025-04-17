@@ -1,6 +1,7 @@
 // pages/api/postToBluesky.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { postToBluesky } from "@/lib/postToBluesky";
+import { prisma } from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const id = req.query.id;
@@ -16,6 +17,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
         const success = await postToBluesky(postId);
+
+        if (success !== undefined) {
+            // Delete related ScheduledPostImage entries first due to FK constraint
+            await prisma.scheduledPostImage.deleteMany({
+                where: { postId },
+            });
+
+            await prisma.scheduledPost.delete({
+                where: { id: postId },
+            });
+        }
+
         return res.status(200).json({ success });
     } catch (err) {
         console.error("Bluesky send error:", err);

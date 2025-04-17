@@ -123,6 +123,11 @@ export default function DbPage() {
       const res = await fetch(`/api/postToBluesky?id=${id}`, { method: "POST" });
       if (res.ok) {
         toast.success("Post sent to Bluesky");
+  
+        // Immediately remove post from state
+        setPosts((prev) => prev.filter((post) => post.id !== id));
+  
+        // Optionally refetch from DB to stay fully in sync
         fetchPosts();
       } else {
         toast.error("Failed to send post");
