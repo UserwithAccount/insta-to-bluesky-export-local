@@ -77,6 +77,28 @@ export default function PreviewPage() {
     toast.success("Times generated");
   };
 
+  const saveSinglePost = async (post: ScheduledPost) => {
+    try {
+      const res = await fetch("/api/schedulePosts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([post]), // single post in array
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(`❌ Failed to save post: ${data.error || "Unknown error"}`);
+      } else {
+        toast.success(`✅ Post saved to DB`);
+      }
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("❌ Failed to save post");
+    }
+  };
+
+
   const schedulePosts = async () => {
     const batchSize = 5;
     const delay = 200;
@@ -166,14 +188,12 @@ export default function PreviewPage() {
             <span className="text-sm text-zinc-700">Only show posts with mentions</span>
             <button
               onClick={() => setFilterMentionsOnly((prev) => !prev)}
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
-                filterMentionsOnly ? "bg-indigo-600" : "bg-gray-300"
-              }`}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${filterMentionsOnly ? "bg-indigo-600" : "bg-gray-300"
+                }`}
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                  filterMentionsOnly ? "translate-x-6" : "translate-x-0"
-                }`}
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${filterMentionsOnly ? "translate-x-6" : "translate-x-0"
+                  }`}
               ></div>
             </button>
           </label>
@@ -185,7 +205,15 @@ export default function PreviewPage() {
             .map((post, idx) => (
               <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
                 <div className="flex justify-between mb-2 items-center">
-                  {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
+                  <div className="flex items-center gap-2">
+                    {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
+                    <button
+                      onClick={() => saveSinglePost(post)}
+                      className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                  </div>
                   <button
                     onClick={() => removePost(post)}
                     className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
@@ -193,6 +221,7 @@ export default function PreviewPage() {
                     Remove
                   </button>
                 </div>
+
                 <div className="w-full mb-4 rounded overflow-hidden" style={{ aspectRatio: "4 / 3" }}>
                   <Swiper spaceBetween={10}>
                     {post.images.map((img, i) => (
