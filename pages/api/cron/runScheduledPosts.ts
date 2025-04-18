@@ -16,8 +16,8 @@ const transporter = nodemailer.createTransport({
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST" && req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
   try {
