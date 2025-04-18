@@ -56,8 +56,8 @@ export default function PreviewPage() {
     setPosts(updated);
   };
 
-  const removePost = (index: number) => {
-    const updated = posts.filter((_, i) => i !== index);
+  const removePost = (postToRemove: ScheduledPost) => {
+    const updated = posts.filter((post) => post !== postToRemove);
     setPosts(updated);
     toast.success("Post removed");
   };
@@ -187,7 +187,7 @@ export default function PreviewPage() {
                 <div className="flex justify-between mb-2 items-center">
                   {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
                   <button
-                    onClick={() => removePost(idx)}
+                    onClick={() => removePost(post)}
                     className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
                   >
                     Remove
@@ -210,14 +210,14 @@ export default function PreviewPage() {
                 <textarea
                   rows={3}
                   value={post.title}
-                  onChange={(e) => handleTitleChange(idx, e.target.value)}
+                  onChange={(e) => handleTitleChange(posts.indexOf(post), e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
                 />
                 <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
                 <input
                   type="datetime-local"
                   value={post.scheduledTime || ""}
-                  onChange={(e) => handleTimeChange(idx, e.target.value)}
+                  onChange={(e) => handleTimeChange(posts.indexOf(post), e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded"
                 />
               </div>
