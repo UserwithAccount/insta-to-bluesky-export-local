@@ -1,12 +1,11 @@
+// pages/api/cron/testScheduled.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import handler from "@/pages/api/cron/runScheduledPosts"; // Import the real cron job handler
 
-// Call the real cron job handler for testing
-export default async function testHandler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Use GET to test the cron job" });
-  }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/cron/processScheduled`, {
+    method: "POST",
+  });
 
-  // Wrap it to simulate a POST request
-  return handler({ ...req, method: "POST" } as NextApiRequest, res);
+  const data = await response.json();
+  res.status(response.status).json(data);
 }
