@@ -2,7 +2,7 @@
     "cron": {
       "runScheduledPosts": {
         "path": "/api/cron/runScheduledPosts",
-        "schedule": "*/5 * * * *"
+        "schedule": "*/1 * * * *"
       }
     }
   }
