@@ -13,6 +13,6 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -X POST https://your-app.vercel.app/api/cron/runScheduledPosts \
+          curl -X POST https://insta-to-bluesky-export.vercel.app/api/cron/runScheduledPosts \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $CRON_SECRET"
