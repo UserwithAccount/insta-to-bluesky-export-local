@@ -15,6 +15,7 @@ model ScheduledPost {
   posted        Boolean               @default(false)
   createdAt     DateTime              @default(now())
   images        ScheduledPostImage[]
+  cronLogs      CronLog[]
 }
 
 model ScheduledPostImage {
@@ -35,7 +36,8 @@ model CronLog {
   id        Int      @id @default(autoincrement())
   postId    Int
   status    String
-  message   String?
+  message   String
   attempts  Int
   createdAt DateTime @default(now())
+  scheduledPost ScheduledPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
