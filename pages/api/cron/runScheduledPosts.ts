@@ -3,10 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { postToBluesky } from "@/lib/postToBluesky";
 import nodemailer from "nodemailer";
 
-export const config = {
-  runtime: "edge",
-};
-
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "587"),
