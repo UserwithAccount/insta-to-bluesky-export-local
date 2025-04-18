@@ -18,6 +18,7 @@ export default function PreviewPage() {
   const [error, setError] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [intervalHours, setIntervalHours] = useState<number>(24);
+  const [filterMentionsOnly, setFilterMentionsOnly] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -159,47 +160,68 @@ export default function PreviewPage() {
 
         <SchedulingControls />
 
+        {/* 🔄 Mention Filter Toggle */}
+        <div className="flex items-center mb-6">
+          <label className="flex items-center space-x-3">
+            <span className="text-sm text-zinc-700">Only show posts with mentions</span>
+            <button
+              onClick={() => setFilterMentionsOnly((prev) => !prev)}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+                filterMentionsOnly ? "bg-indigo-600" : "bg-gray-300"
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                  filterMentionsOnly ? "translate-x-6" : "translate-x-0"
+                }`}
+              ></div>
+            </button>
+          </label>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {posts.map((post, idx) => (
-            <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
-              <div className="flex justify-between mb-2 items-center">
-                {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
-                <button
-                  onClick={() => removePost(idx)}
-                  className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
-                >
-                  Remove
-                </button>
+          {posts
+            .filter((post) => !filterMentionsOnly || post.hasMention)
+            .map((post, idx) => (
+              <div key={idx} className="bg-white rounded-lg shadow p-4 relative">
+                <div className="flex justify-between mb-2 items-center">
+                  {post.hasMention && <span className="text-yellow-500 text-xl">⚠️</span>}
+                  <button
+                    onClick={() => removePost(idx)}
+                    className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="w-full mb-4 rounded overflow-hidden" style={{ aspectRatio: "4 / 3" }}>
+                  <Swiper spaceBetween={10}>
+                    {post.images.map((img, i) => (
+                      <SwiperSlide key={i}>
+                        <img
+                          src={img}
+                          alt={`Post ${idx + 1} Image ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </SwiperSlide>
+                    ))}
+                  </Swiper>
+                </div>
+                <label className="block text-sm font-semibold mb-1">Title</label>
+                <textarea
+                  rows={3}
+                  value={post.title}
+                  onChange={(e) => handleTitleChange(idx, e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
+                />
+                <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
+                <input
+                  type="datetime-local"
+                  value={post.scheduledTime || ""}
+                  onChange={(e) => handleTimeChange(idx, e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
               </div>
-              <div className="w-full mb-4 rounded overflow-hidden" style={{ aspectRatio: "4 / 3" }}>
-                <Swiper spaceBetween={10}>
-                  {post.images.map((img, i) => (
-                    <SwiperSlide key={i}>
-                      <img
-                        src={img}
-                        alt={`Post ${idx + 1} Image ${i + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </div>
-              <label className="block text-sm font-semibold mb-1">Title</label>
-              <textarea
-                rows={3}
-                value={post.title}
-                onChange={(e) => handleTitleChange(idx, e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded mb-3 whitespace-pre-line"
-              />
-              <label className="block text-sm font-semibold mb-1">Scheduled Time</label>
-              <input
-                type="datetime-local"
-                value={post.scheduledTime || ""}
-                onChange={(e) => handleTimeChange(idx, e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded"
-              />
-            </div>
-          ))}
+            ))}
         </div>
 
         <SchedulingControls />
