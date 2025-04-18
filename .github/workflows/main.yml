@@ -1,0 +1,19 @@
+name: Scheduled Bluesky Poster
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # runs every 15 minutes
+  workflow_dispatch: # allows manual triggering from GitHub UI
+
+  env:
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+jobs:
+  call-cron-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl POST to cron endpoint
+        run: |
+          curl -X POST https://your-app.vercel.app/api/cron/runScheduledPosts \
+            -H "Content-Type: application/json"
+            -H "Authorization: Bearer $CRON_SECRET"
