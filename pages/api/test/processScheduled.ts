@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/cron/processScheduled`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/cron/runScheduledPosts`, {
     method: "POST",
   });
 
