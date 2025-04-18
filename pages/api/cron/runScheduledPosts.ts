@@ -4,17 +4,21 @@ import { prisma } from "@/lib/prisma";
 import { postToBluesky } from "@/lib/postToBluesky";
 import nodemailer from "nodemailer";
 
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || "";
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587");
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "587"),
+  host: SMTP_HOST,
+  port: SMTP_PORT,
   secure: false,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: SMTP_USER,
+    pass: SMTP_PASS,
   },
 });
-
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -24,14 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const now = new Date();
     const duePosts = await prisma.scheduledPost.findMany({
-      where: {
-        posted: false,
-        scheduledTime: { lte: now },
-      },
+      where: { posted: false, scheduledTime: { lte: now } },
       include: { images: true },
     });
 
-    const results = [];
+    const results: any[] = [];
 
     for (const post of duePosts) {
       let attempts = 0;
@@ -45,7 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } catch (err: any) {
           attempts++;
           lastError = err?.message || String(err);
-          console.error(`Attempt ${attempts} failed for post ${post.id}:`, lastError);
         }
       }
 
@@ -58,24 +58,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
-      if (!success && attempts >= 5 && NOTIFY_EMAIL) {
-        await transporter.sendMail({
-          from: `\"Bluesky Poster\" <${process.env.SMTP_USER}>`,
-          to: NOTIFY_EMAIL,
-          subject: `\uD83D\uDEA8 Failed to post (ID: ${post.id})`,
-          text: `The scheduled post with ID ${post.id} failed after 5 attempts.\n\nLast error:\n${lastError}`,
-        });
+      if (!success && attempts === 5 && NOTIFY_EMAIL) {
+        try {
+          await transporter.sendMail({
+            from: `"Bluesky Export" <${SMTP_USER}>`,
+            to: NOTIFY_EMAIL,
+            subject: `❌ Post Failed after 5 Attempts (Post ID: ${post.id})`,
+            text: `Post ${post.id} failed to send after 5 attempts.\n\nLast error:\n${lastError}`,
+          });
+        } catch (emailError: any) {
+          console.error("❌ Email sending failed:", emailError.message || emailError);
+        }
       }
 
       results.push({ id: post.id, success, attempts });
     }
 
-    return res.status(200).json({ results });
-  } catch (error: any) {
-    console.error("Cron job error (top-level):", error);
-    return res.status(500).json({
-      error: "Failed to process scheduled posts",
-      details: error.message || String(error),
-    });
+    return res.status(200).json({ success: true, results });
+  } catch (err: any) {
+    console.error("❌ processScheduled failed:", err.message || err);
+    return res.status(500).json({ error: "Failed to process scheduled posts" });
   }
 }
