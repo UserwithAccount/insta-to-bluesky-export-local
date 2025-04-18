@@ -9,8 +9,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Required ENV vars
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, NOTIFY_EMAIL } = process.env;
+  const { CRON_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, NOTIFY_EMAIL } = process.env;
+
+  // 🔒 Verify the request is authorized
+  const authHeader = req.headers.authorization;
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    console.warn("🚫 Unauthorized cron attempt");
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  // 🚧 Check required SMTP environment variables
   if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
     console.error("❌ Missing SMTP configuration in environment variables.");
     return res.status(500).json({ error: "SMTP configuration missing" });
