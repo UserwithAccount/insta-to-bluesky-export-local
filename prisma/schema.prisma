@@ -30,3 +30,12 @@ model Credential {
   password String
   createdAt   DateTime @default(now())
 }
+
+model CronLog {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  status    String
+  message   String?
+  attempts  Int
+  createdAt DateTime @default(now())
+}

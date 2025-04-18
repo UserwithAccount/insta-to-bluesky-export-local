@@ -1,0 +1,8 @@
+{
+    "cron": {
+      "runScheduledPosts": {
+        "path": "/api/runScheduledPosts",
+        "schedule": "*/5 * * * *"
+      }
+    }
+  }
