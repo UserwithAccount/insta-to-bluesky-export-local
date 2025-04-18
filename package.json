@@ -26,6 +26,7 @@
     "next-connect": "^1.0.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.10.1",
+    "openssl-node": "^1.0.1",
     "postgres": "^3.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.0.0",
