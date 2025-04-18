@@ -77,19 +77,21 @@ export default function PreviewPage() {
     toast.success("Times generated");
   };
 
-  const saveSinglePost = async (post: ScheduledPost) => {
+  const saveSinglePost = async (postToSave: ScheduledPost) => {
     try {
       const res = await fetch("/api/schedulePosts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([post]), // single post in array
+        body: JSON.stringify([postToSave]),
       });
-
+  
       const data = await res.json();
-
+  
       if (!res.ok) {
         toast.error(`❌ Failed to save post: ${data.error || "Unknown error"}`);
       } else {
+        // Remove the saved post from the list
+        setPosts((prev) => prev.filter((post) => post !== postToSave));
         toast.success(`✅ Post saved to DB`);
       }
     } catch (err) {
@@ -97,6 +99,7 @@ export default function PreviewPage() {
       toast.error("❌ Failed to save post");
     }
   };
+  
 
 
   const schedulePosts = async () => {
