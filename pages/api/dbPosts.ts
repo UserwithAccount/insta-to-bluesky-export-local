@@ -1,7 +1,7 @@
-// pages/api/dbPosts.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
-import { supabase } from "@/lib/supabase"; // uses service role key
+import fs from "fs/promises";
+import path from "path";
 
 const prisma = new PrismaClient();
 
@@ -57,18 +57,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { postId: parseInt(id) },
       });
 
-      const pathsToDelete = images.map((img) =>
-        img.imageUri.replace(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/`,
-          ""
-        )
-      );
+      // Optional: Bilder lokal löschen
+      for (const img of images) {
+        const relativePath = img.imageUri.startsWith("/uploads/")
+          ? img.imageUri.replace("/uploads/", "")
+          : "";
 
-      if (pathsToDelete.length > 0) {
-        const { error: storageError } = await supabase.storage.from("uploads").remove(pathsToDelete);
-        if (storageError) {
-          console.error("Storage deletion error:", storageError);
-          return res.status(500).json({ error: "Failed to delete images from storage" });
+        if (relativePath) {
+          const filePath = path.join(process.cwd(), "public", "uploads", relativePath);
+          try {
+            await fs.unlink(filePath);
+            console.log("🗑️ Deleted local file:", filePath);
+          } catch (err) {
+            console.warn("⚠️ Could not delete file (may not exist):", filePath);
+          }
         }
       }
 

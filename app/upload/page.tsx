@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
@@ -15,129 +14,42 @@ export default function UploadPage() {
   useEffect(() => scrollToBottom(), [logs]);
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
-  const fetchAllFileNames = async (): Promise<Set<string>> => {
-    let { data, error } = await supabase.rpc("get_all_filenames", { bucket: "uploads" });
-
-    if (error) {
-      console.error("Error fetching filenames from SQL function:", error.message);
-      return new Set();
-    }
-
-    const filenames = data?.map((entry: { name: string }) => entry.name) || [];
-    return new Set(filenames);
-  };
-
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     setUploading(true);
     setLogs(["📂 Upload started..."]);
-    let uploadedCount = 0;
+    setProgress(0);
 
-    const jsonFile = Array.from(files).find((f) => f.name.endsWith(".json"));
-    if (!jsonFile) {
-      addLog("❌ JSON file missing.");
-      setUploading(false);
-      return;
-    }
+    const uploadId = crypto.randomUUID();
 
-    const existingFilenames = await fetchAllFileNames();
-    console.log("Fetched files from Supabase:", existingFilenames);
-
-    const jsonText = await jsonFile.text();
-    const rawPosts = JSON.parse(jsonText);
-
-    const imageMap = new Map<string, File>();
-    for (const file of Array.from(files)) {
-      if (file !== jsonFile) imageMap.set(file.name, file);
-    }
-
-    const output: {
-      postId: string;
-      title: string;
-      hasMention: boolean;
-      images: string[];
-    }[] = [];
-
-    for (const post of rawPosts) {
-      const media = Array.isArray(post.media) ? post.media : [];
-      const postId =
-        post.creation_timestamp?.toString() ||
-        media[0]?.creation_timestamp?.toString() ||
-        crypto.randomUUID();
-
-      const rawTitle =
-        post.title?.trim() ||
-        media.find((m: any) => m.title?.trim())?.title?.trim() ||
-        "Untitled";
-
-      const title = decodeURIComponent(escape(rawTitle)).replace(/\\n/g, "\n");
-      const hasMention = /@\w+/.test(title);
-      const imageUris: string[] = [];
-
-      for (const item of media) {
-        const fileName = item.uri.split("/").pop();
-        if (!fileName) continue;
-
-        const file = imageMap.get(fileName);
-        if (!file) {
-          addLog(`⚠️ Missing file: ${fileName}`);
-          continue;
-        }
-
-        if (existingFilenames.has(fileName)) {
-          addLog(`⏭️ Skipped (already exists): ${fileName}`);
-        } else {
-          const { error } = await supabase.storage.from("uploads").upload(fileName, file, {
-            upsert: false,
-            contentType: file.type,
-          });
-
-          if (error) {
-            if (error.message.includes("resource already exists")) {
-              addLog(`⏭️ Skipped (already exists): ${fileName}`);
-            } else {
-              addLog(`❌ Failed: ${fileName} (${error.message})`);
-              continue;
-            }
-          } else {
-            addLog(`✅ Uploaded: ${fileName}`);
-            uploadedCount++;
-          }
-
-          existingFilenames.add(fileName);
-        }
-
-        const publicUrl = supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-        imageUris.push(publicUrl);
-        setProgress(Math.round((uploadedCount / files.length) * 100));
-      }
-
-      if (imageUris.length > 0) {
-        output.push({ postId, title, hasMention, images: imageUris });
-      }
-    }
-
-    const jsonBlob = new Blob([JSON.stringify(output, null, 2)], {
-      type: "application/json",
+    const formData = new FormData();
+    Array.from(files).forEach((file) => {
+      formData.append("files", file, file.webkitRelativePath || file.name);
     });
 
-    const { error: jsonError } = await supabase.storage
-      .from("uploads")
-      .upload(`uploadData.json`, jsonBlob, {
-        upsert: true,
-        contentType: "application/json",
+    try {
+      const res = await fetch(`/api/upload?uploadId=${uploadId}`, {
+        method: "POST",
+        body: formData,
       });
 
-    if (jsonError) {
-      addLog("❌ Failed to upload uploadData.json");
-    } else {
-      addLog("📦 uploadData.json saved to Supabase");
-    }
+      const data = await res.json();
 
-    setTimeout(() => router.push("/preview"), 1500);
-    setUploading(false);
+      if (!res.ok || !data.success) {
+        addLog("❌ Upload failed.");
+      } else {
+        addLog(`✅ Uploaded ${data.count} post(s)`);
+        setProgress(100);
+        setTimeout(() => router.push("/preview"), 1500);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      addLog("❌ Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (

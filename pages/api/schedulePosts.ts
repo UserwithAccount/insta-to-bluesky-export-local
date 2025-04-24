@@ -28,29 +28,35 @@ export default async function handler(
 
     for (const post of scheduledPosts) {
       const caption = post.title || post.description || "";
-
-      // ✅ Safely parse scheduledTime
-      const parsed = new Date(post.scheduledTime);
-      const scheduledTime = isNaN(parsed.getTime()) ? new Date() : parsed;
+      const parsedTime = new Date(post.scheduledTime);
+      const scheduledTime = isNaN(parsedTime.getTime()) ? new Date() : parsedTime;
 
       const imagesToUse = Array.isArray(post.images)
         ? post.images.slice(0, 4)
         : post.uri
-          ? [post.uri]
-          : [];
+        ? [post.uri]
+        : [];
 
-      if (imagesToUse.length === 0) continue;
+      if (imagesToUse.length === 0) {
+        console.warn("Skipping post with no images");
+        continue;
+      }
 
       const createdPost = await prisma.scheduledPost.create({
-        data: { title: caption, scheduledTime },
+        data: {
+          title: caption,
+          scheduledTime,
+        },
       });
 
-      await prisma.scheduledPostImage.createMany({
-        data: imagesToUse.map((uri) => ({
-          imageUri: uri,
-          postId: createdPost.id,
-        })),
-      });
+      if (imagesToUse.length > 0) {
+        await prisma.scheduledPostImage.createMany({
+          data: imagesToUse.map((imageUri) => ({
+            imageUri,
+            postId: createdPost.id,
+          })),
+        });
+      }
 
       createdPosts.push(createdPost);
     }

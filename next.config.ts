@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['localhost', 'jknqsynwantbduipykqx.supabase.co'], // add your Vercel domain here later too
+    domains: ['localhost'], 
   },
   eslint: {
     ignoreDuringBuilds: true,

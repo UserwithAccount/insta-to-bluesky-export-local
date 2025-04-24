@@ -1,10 +1,8 @@
-// pages/api/upload.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "@/lib/supabase"; // Import the shared Supabase client
 
 export const config = {
   api: {
@@ -41,7 +39,6 @@ function formatTitle(title: string): string {
 declare global {
   var uploadLogs: Record<string, string[]> | undefined;
 }
-
 if (!global.uploadLogs) global.uploadLogs = {};
 
 function pushLog(uploadId: string, message: string) {
@@ -64,22 +61,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "No files received" });
     }
 
-    const jsonFile = files.find((file) => file.originalname.endsWith(".json"));
-    if (!jsonFile) {
-      pushLog(uploadId, "❌ No JSON file found.");
-      return res.status(400).json({ error: "No JSON file found" });
+    // 📦 Filter alle post_*.json-Dateien
+    const jsonFiles = files.filter((file) =>
+      file.originalname.endsWith(".json") && file.originalname.includes("posts_")
+    );
+
+    if (jsonFiles.length === 0) {
+      pushLog(uploadId, "❌ No matching JSON files found (must include 'post_').");
+      return res.status(400).json({ error: "No matching JSON files found (must include 'post_')" });
     }
 
-    const jsonText = jsonFile.buffer.toString("utf-8");
-    const rawPosts = JSON.parse(jsonText);
+    // 📥 Kombiniere alle passenden JSON-Dateien
+    let rawPosts: any[] = [];
 
+    for (const jsonFile of jsonFiles) {
+      try {
+        const jsonText = jsonFile.buffer.toString("utf-8");
+        const parsed = JSON.parse(jsonText);
+        if (Array.isArray(parsed)) {
+          rawPosts.push(...parsed);
+        } else {
+          rawPosts.push(parsed);
+        }
+        pushLog(uploadId, `✅ Loaded: ${jsonFile.originalname}`);
+      } catch (err) {
+        pushLog(uploadId, `❌ Failed to parse: ${jsonFile.originalname}`);
+        console.error("JSON parse error:", err);
+      }
+    }
+
+    // 🗺️ Map Bilder
     const imageMap = new Map<string, Express.Multer.File>();
     for (const file of files) {
-      if (file !== jsonFile) {
+      if (!file.originalname.endsWith(".json")) {
         const name = path.basename(file.originalname);
         imageMap.set(name, file);
       }
     }
+
+    const uploadsDir = path.join(process.cwd(), "public/uploads");
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
 
     const output: {
       postId: string;
@@ -111,29 +132,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
 
-        const existing = await supabase.storage.from("uploads").list("", {
-          search: fileName,
-        });
-
-        if (existing.data?.some((obj) => obj.name === fileName)) {
+        const filePath = path.join(uploadsDir, fileName);
+        if (fs.existsSync(filePath)) {
           pushLog(uploadId, `⏭️ Skipped (already exists): ${fileName}`);
-          imageUris.push(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${fileName}`);
-          continue;
-        }
-
-        const { error } = await supabase.storage
-          .from("uploads")
-          .upload(fileName, file.buffer, {
-            contentType: file.mimetype,
-            upsert: false,
-          });
-
-        if (error) {
-          pushLog(uploadId, `❌ Supabase upload failed: ${error.message}`);
         } else {
+          await fs.promises.writeFile(filePath, file.buffer);
           pushLog(uploadId, `✅ Uploaded: ${fileName}`);
-          imageUris.push(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${fileName}`);
         }
+
+        imageUris.push(`/uploads/${fileName}`);
       }
 
       if (imageUris.length > 0) {
@@ -141,25 +148,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Upload uploadData.json to Supabase Storage
-    const jsonBuffer = Buffer.from(JSON.stringify(output, null, 2), "utf-8");
-    const { error: jsonUploadError } = await supabase.storage
-      .from("uploads")
-      .upload("uploadData.json", jsonBuffer, {
-        contentType: "application/json",
-        upsert: true,
-      });
-
-    if (jsonUploadError) {
-      pushLog(uploadId, `❌ Failed to upload uploadData.json: ${jsonUploadError.message}`);
-    } else {
-      pushLog(uploadId, "✅ uploadData.json saved to Supabase");
-    }
+    const outputPath = path.join(uploadsDir, "uploadData.json");
+    await fs.promises.writeFile(outputPath, JSON.stringify(output, null, 2), "utf-8");
+    pushLog(uploadId, "✅ uploadData.json saved locally");
 
     return res.status(200).json({ success: true, count: output.length });
   } catch (error) {
     console.error("❌ Upload failed:", error);
-    pushLog(req.query.uploadId as string, "❌ Upload failed");
+    pushLog(uploadId, "❌ Upload failed");
     res.status(500).json({ error: "Upload failed" });
   }
 }

@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { BskyAgent } from "@atproto/api";
+import { AtpAgent } from "@atproto/api";
 import CryptoJS from "crypto-js";
+import fs from "fs/promises";
+import path from "path";
 
 const SECRET_KEY = process.env.CREDENTIAL_SECRET_KEY!;
-const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
+const BSKY_API_URL = process.env.BSKY_API_URL || "https://bsky.social";
 
 export async function postToBluesky(postId: number) {
-
   if (!SECRET_KEY) throw new Error("CREDENTIAL_SECRET_KEY is not set");
 
   const post = await prisma.scheduledPost.findUnique({
@@ -27,33 +28,45 @@ export async function postToBluesky(postId: number) {
     SECRET_KEY
   ).toString(CryptoJS.enc.Utf8);
 
-  const agent = new BskyAgent({ service: "https://bsky.social" });
-  await agent.login({ identifier: credentials.handle, password: decryptedPassword });
+  const client = new AtpAgent({ service: BSKY_API_URL });
+  await client.login({
+    identifier: credentials.handle,
+    password: decryptedPassword,
+  });
 
   const blobs = await Promise.all(
     post.images.map(async ({ imageUri }) => {
-      const fullUrl = imageUri.startsWith("http")
-        ? imageUri
-        : `${BASE_URL}${imageUri.startsWith("/") ? "" : "/"}${imageUri}`;
+      const filePath = path.join(process.cwd(), "public", imageUri.replace(/^\/uploads\//, "uploads/"));
 
-      const res = await fetch(fullUrl);
-      if (!res.ok) throw new Error(`Failed to fetch image: ${imageUri}`);
+      let fileBuffer: Buffer;
+      try {
+        fileBuffer = await fs.readFile(filePath);
+      } catch (err) {
+        throw new Error(`Failed to read local image file: ${filePath}`);
+      }
 
-      const buffer = await res.arrayBuffer();
-      return await agent.uploadBlob(new Uint8Array(buffer), {
+      const uploaded = await client.com.atproto.repo.uploadBlob(fileBuffer, {
         encoding: "image/jpeg",
       });
+
+      return uploaded.data.blob;
     })
   );
 
-  await agent.post({
-    text: post.title || "",
-    embed: {
-      $type: "app.bsky.embed.images",
-      images: blobs.map((blob) => ({
-        image: blob.data.blob,
-        alt: "Image",
-      })),
+  await client.com.atproto.repo.createRecord({
+    repo: client.session?.did ?? (() => { throw new Error("Client session is undefined"); })(),
+    collection: "app.bsky.feed.post",
+    record: {
+      $type: "app.bsky.feed.post",
+      text: post.title || "",
+      createdAt: new Date().toISOString(),
+      embed: {
+        $type: "app.bsky.embed.images",
+        images: blobs.map((blob) => ({
+          image: blob,
+          alt: "Image",
+        })),
+      },
     },
   });
 
@@ -61,4 +74,6 @@ export async function postToBluesky(postId: number) {
     where: { id: postId },
     data: { posted: true },
   });
+
+  return true;
 }

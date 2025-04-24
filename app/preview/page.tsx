@@ -24,23 +24,22 @@ export default function PreviewPage() {
   useEffect(() => {
     async function fetchPosts() {
       try {
-        const res = await fetch("/api/listUploads");
+        const res = await fetch("/uploads/uploadData.json");
+        if (!res.ok) throw new Error("Upload data not found.");
         const data = await res.json();
-        if (data.success) {
-          const enriched = data.posts.map((post: ScheduledPost) => ({
-            ...post,
-            scheduledTime: post.scheduledTime || "",
-          }));
-          setPosts(enriched);
-        } else {
-          setError("Failed to load posts.");
-        }
+  
+        const enriched = data.map((post: ScheduledPost) => ({
+          ...post,
+          scheduledTime: post.scheduledTime || "",
+        }));
+  
+        setPosts(enriched);
       } catch (err) {
         console.error("Fetch error:", err);
-        setError("Error loading posts.");
+        setError("Error loading uploadData.json");
       }
     }
-
+  
     fetchPosts();
   }, []);
 

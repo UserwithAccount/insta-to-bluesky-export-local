@@ -1,0 +1,10 @@
+-- CreateTable
+CREATE TABLE "CronLog" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "postId" INTEGER NOT NULL,
+    "status" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "attempts" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CronLog_postId_fkey" FOREIGN KEY ("postId") REFERENCES "ScheduledPost" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
