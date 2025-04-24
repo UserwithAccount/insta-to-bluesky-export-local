@@ -18,7 +18,7 @@ To run this project, you need to create a `.env` file in the root of your projec
 | `AUTH_USERNAME`          | The username for accessing protected routes or admin features.             | `admin`                               |
 | `AUTH_PASSWORD`          | The password for accessing protected routes or admin features.             | `supersecret`                         |
 
-```properties ```
+```properties 
 DATABASE_URL="postgresql://user:password@host:port/database"
 BASE_URL="http://localhost:3000"
 BLUESKY_SERVICE="https://bsky.social"
@@ -26,6 +26,7 @@ CREDENTIAL_SECRET_KEY="fa07b86b7fc272312671e105a01fff3ac8fbf8ce2baceccfd99be2313
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"
 AUTH_USERNAME="admin"
 AUTH_PASSWORD="supersecret"
+```
 
 ## Getting Started
 
