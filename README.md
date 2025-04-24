@@ -18,7 +18,7 @@ To run this project, you need to create a `.env` file in the root of your projec
 | `AUTH_USERNAME`          | The username for accessing protected routes or admin features.             | `admin`                               |
 | `AUTH_PASSWORD`          | The password for accessing protected routes or admin features.             | `supersecret`                         |
 
-```properties
+```properties ```
 DATABASE_URL="postgresql://user:password@host:port/database"
 BASE_URL="http://localhost:3000"
 BLUESKY_SERVICE="https://bsky.social"
@@ -67,6 +67,7 @@ To export your Instagram posts and use them in this project, follow these steps:
    ```bash
    git clone https://github.com/your-username/insta-to-bluesky-export.git
    cd insta-to-bluesky-export
+   use the "local-app" branch when you want to deploy locally!
    ```
 
 2. Install dependencies:
